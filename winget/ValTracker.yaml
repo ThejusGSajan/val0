@@ -1,0 +1,27 @@
+# winget/ValTracker.yaml
+PackageIdentifier: ValTracker.ValTrackerTUI
+PackageVersion: 1.0.0
+PackageName: Val-Tracker
+Publisher: ValTracker
+License: MIT
+ShortDescription: A minimalistic terminal dashboard for Valorant players.
+Description: >-
+  Val-Tracker is a modern TUI application that displays your Valorant daily shop,
+  night market, and battlepass progression directly in the terminal.
+  It reads the local Riot Client lockfile for authentication — no passwords
+  are ever entered or stored.
+Tags:
+  - valorant
+  - tui
+  - terminal
+  - gaming
+  - go
+Installers:
+  - Architecture: x64
+    InstallerType: portable
+    InstallerUrl: https://github.com/val-tracker/val-tracker/releases/download/v1.0.0/val-tracker.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    Commands:
+      - val-tracker
+ManifestType: singleton
+ManifestVersion: 1.6.0
