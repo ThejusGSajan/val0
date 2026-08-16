@@ -401,11 +401,21 @@ func (m MainModel) loadData() tea.Msg {
 				iconURL = *asset.Levels[0].DisplayIcon
 			}
 
+			// Calculate discounted price
+			cost := bo.Offer.Cost[vpUUID]
+			if len(bo.DiscountCosts) > 0 && bo.DiscountCosts[vpUUID] > 0 {
+				cost = bo.DiscountCosts[vpUUID]
+			} else if len(bo.DiscountedCost) > 0 && bo.DiscountedCost[vpUUID] > 0 {
+				cost = bo.DiscountedCost[vpUUID]
+			} else if bo.DiscountPercent > 0 && cost > 0 {
+				cost = cost - (cost * bo.DiscountPercent / 100)
+			}
+
 			nightSkins = append(nightSkins, models.ResolvedSkin{
 				UUID:        skinID,
 				DisplayName: asset.DisplayName,
 				Rarity:      RarityNameMap[tierUUID],
-				CostVP:      bo.DiscountCosts[vpUUID],
+				CostVP:      cost,
 				IconURL:     iconURL,
 				Sprite:      sprite.Render(iconURL),
 			})

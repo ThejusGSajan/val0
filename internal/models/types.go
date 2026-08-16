@@ -89,6 +89,7 @@ type BonusStoreOffer struct {
 	Offer           SingleItemStoreOffer `json:"Offer"`
 	DiscountPercent int                  `json:"DiscountPercent"`
 	DiscountCosts   map[string]int       `json:"DiscountCosts"`
+	DiscountedCost  map[string]int       `json:"DiscountedCost"`
 	IsSeen          bool                 `json:"IsSeen"`
 }
 

@@ -12,7 +12,7 @@ import (
 //	GET https://pd.{shard}.a.pvp.net/contracts/v1/contracts/{puuid}
 func (c *Client) FetchContracts() (*models.ContractsResponse, error) {
 	url := c.pdURL(fmt.Sprintf("/contracts/v1/contracts/%s", c.session.PUUID))
-	body, err := c.doRequest(url)
+	body, err := c.doRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fetch contracts: %w", err)
 	}
@@ -29,7 +29,7 @@ func (c *Client) FetchContracts() (*models.ContractsResponse, error) {
 //	GET https://shared.{shard}.a.pvp.net/content-service/v3/content
 func (c *Client) FetchContent() (*models.ContentResponse, error) {
 	url := c.sharedURL("/content-service/v3/content")
-	body, err := c.doRequest(url)
+	body, err := c.doRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fetch content: %w", err)
 	}

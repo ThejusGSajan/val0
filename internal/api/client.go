@@ -34,9 +34,14 @@ func NewClient(session *models.Session) *Client {
 	}
 }
 
-// doRequest performs an authenticated GET against a Riot endpoint.
-func (c *Client) doRequest(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+// Session returns the underlying session.
+func (c *Client) Session() *models.Session {
+	return c.session
+}
+
+// doRequest performs an authenticated HTTP request against a Riot endpoint.
+func (c *Client) doRequest(method, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -45,22 +50,25 @@ func (c *Client) doRequest(url string) ([]byte, error) {
 	req.Header.Set("X-Riot-Entitlements-JWT", c.session.EntitlementToken)
 	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
 	req.Header.Set("X-Riot-ClientVersion", c.session.ClientVersion)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request %s: %w", url, err)
+		return nil, fmt.Errorf("request %s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, url, string(body))
+		return nil, fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, url, string(respBody))
 	}
-	return body, nil
+	return respBody, nil
 }
 
 // pdURL builds a full URL against the Player Data service.
