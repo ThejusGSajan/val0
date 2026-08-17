@@ -98,3 +98,96 @@ func TestEntitlementResponseUnmarshal(t *testing.T) {
 		t.Errorf("expected PUUID 'puuid-12345-67890', got '%s'", ent.Subject)
 	}
 }
+
+func TestWalletResponse(t *testing.T) {
+	sampleJSON := `{
+		"Balances": {
+			"85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741": 4350,
+			"e59aa87c-4cbf-517a-5983-6e81511be9b7": 85,
+			"f08d4ae3-939c-4576-ab26-09ce1f23bb37": 10000
+		}
+	}`
+
+	var w WalletResponse
+	if err := json.Unmarshal([]byte(sampleJSON), &w); err != nil {
+		t.Fatalf("failed to unmarshal wallet: %v", err)
+	}
+
+	if w.VP() != 4350 {
+		t.Errorf("expected VP 4350, got %d", w.VP())
+	}
+	if w.RP() != 85 {
+		t.Errorf("expected RP 85, got %d", w.RP())
+	}
+	if w.KC() != 10000 {
+		t.Errorf("expected KC 10000, got %d", w.KC())
+	}
+}
+
+func TestMMRResponse(t *testing.T) {
+	sampleJSON := `{
+		"Subject": "player-123",
+		"LatestCompetitiveUpdate": {
+			"MatchID": "match-1",
+			"TierAfterUpdate": 21,
+			"RankedRatingAfterUpdate": 52,
+			"RankedRatingEarned": 22
+		},
+		"QueueSkills": {
+			"competitive": {
+				"SeasonalInfoBySeasonID": {
+					"season-1": {
+						"CompetitiveTier": 21,
+						"RankedRating": 52
+					}
+				}
+			}
+		}
+	}`
+
+	var mmr MMRResponse
+	if err := json.Unmarshal([]byte(sampleJSON), &mmr); err != nil {
+		t.Fatalf("failed to unmarshal mmr: %v", err)
+	}
+
+	tier, rr := mmr.GetCurrentCompetitiveInfo()
+	if tier != 21 || rr != 52 {
+		t.Errorf("expected tier 21, rr 52, got tier %d, rr %d", tier, rr)
+	}
+}
+
+func TestContractsResponseWithMissions(t *testing.T) {
+	sampleJSON := `{
+		"Version": 1,
+		"Subject": "player-123",
+		"Contracts": [],
+		"Missions": [
+			{
+				"ID": "mission-daily-1",
+				"Objectives": {
+					"obj-1": 5
+				},
+				"Complete": false
+			},
+			{
+				"ID": "mission-daily-2",
+				"Complete": true
+			}
+		]
+	}`
+
+	var cr ContractsResponse
+	if err := json.Unmarshal([]byte(sampleJSON), &cr); err != nil {
+		t.Fatalf("failed to unmarshal contracts with missions: %v", err)
+	}
+
+	if len(cr.Missions) != 2 {
+		t.Fatalf("expected 2 missions, got %d", len(cr.Missions))
+	}
+	if cr.Missions[0].Objectives["obj-1"] != 5 {
+		t.Errorf("expected objective count 5, got %d", cr.Missions[0].Objectives["obj-1"])
+	}
+	if !cr.Missions[1].Complete {
+		t.Errorf("expected mission 2 to be complete")
+	}
+}

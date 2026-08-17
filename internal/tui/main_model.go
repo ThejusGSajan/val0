@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -33,6 +34,11 @@ type DataLoadedMsg struct {
 	NMDiscounts   []int                 // parallel to NightMarket
 	Battlepass    *BattlepassData
 	TimeRemaining int // seconds until shop reset
+	Wallet        *models.WalletResponse
+	MMR           *models.MMRResponse
+	RankName      string
+	Missions      []models.Mission
+	RanksMap      map[int]string
 	Err           error
 }
 
@@ -55,13 +61,19 @@ type MainModel struct {
 	tabNames      map[Tab]string
 	shopModel     ShopModel
 	nightModel    NightMarketModel
-	bpModel       BattlepassModel
+	progressModel ProgressModel
+	bpModel       ProgressModel
 	session       *models.Session
 	regionModel   RegionSelectModel
 	needsRegion   bool
 	loading       bool
 	err           error
 	width, height int
+	wallet        *models.WalletResponse
+	mmr           *models.MMRResponse
+	rankName      string
+	missions      []models.Mission
+	ranksMap      map[int]string
 }
 
 func NewMainModel(session *models.Session) MainModel {
@@ -69,7 +81,7 @@ func NewMainModel(session *models.Session) MainModel {
 	tabNames := map[Tab]string{
 		TabShop:        "  Daily Shop",
 		TabNightMarket: " ✦ Night Market",
-		TabBattlepass:  "  Battlepass",
+		TabBattlepass:  "  Progress",
 	}
 
 	needsRegion := session.Region == ""
@@ -82,6 +94,7 @@ func NewMainModel(session *models.Session) MainModel {
 		needsRegion: needsRegion,
 		regionModel: NewRegionSelectModel(),
 		loading:     !needsRegion,
+		ranksMap:    cache.DefaultRankNames,
 	}
 }
 
@@ -105,6 +118,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.shopModel.SetSize(msg.Width, contentHeight)
 		m.nightModel.SetSize(msg.Width, contentHeight)
+		m.progressModel.SetSize(msg.Width, contentHeight)
+		m.bpModel = m.progressModel
 		m.regionModel.width = msg.Width
 		m.regionModel.height = msg.Height
 		return m, nil
@@ -173,6 +188,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 
+		m.wallet = msg.Wallet
+		m.mmr = msg.MMR
+		m.rankName = msg.RankName
+		m.missions = msg.Missions
+		m.ranksMap = msg.RanksMap
+
 		// Update sub-models
 		headerHeight := 5
 		contentHeight := m.height - headerHeight
@@ -196,9 +217,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if msg.Battlepass != nil {
-			m.bpModel = NewBattlepassModel(msg.Battlepass)
-		}
+		m.progressModel = NewProgressModel(msg.Battlepass, msg.Missions)
+		m.progressModel.SetSize(m.width, contentHeight)
+		m.bpModel = m.progressModel
 		return m, nil
 	}
 
@@ -220,7 +241,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TabNightMarket:
 		m.nightModel, cmd = m.nightModel.Update(msg)
 	case TabBattlepass:
-		m.bpModel, cmd = m.bpModel.Update(msg)
+		m.progressModel, cmd = m.progressModel.Update(msg)
+		m.bpModel = m.progressModel
 	}
 	return m, cmd
 }
@@ -239,11 +261,49 @@ func (m MainModel) View() string {
 	var sb strings.Builder
 
 	// ── Header ──────────────────────────────────────────────────
-	header := TitleStyle.Render("⚡ VAL-TRACKER TUI")
+	var headerParts []string
+	headerParts = append(headerParts, TitleStyle.Render("⚡ VAL-TRACKER TUI"))
 	regionTag := lipgloss.NewStyle().
 		Foreground(ColorMuted).
 		Render(fmt.Sprintf(" [%s]", strings.ToUpper(m.session.Region)))
-	sb.WriteString(header + regionTag + "\n\n")
+	headerParts = append(headerParts, regionTag)
+
+	if m.rankName != "" {
+		tier, rr := 0, 0
+		if m.mmr != nil {
+			tier, rr = m.mmr.GetCurrentCompetitiveInfo()
+		}
+		rankStr := fmt.Sprintf(" ◆ %s (%d RR)", m.rankName, rr)
+		if tier == 0 {
+			rankStr = " ◆ " + m.rankName
+		}
+		rankBadge := lipgloss.NewStyle().
+			Foreground(ColorExclusive).
+			Bold(true).
+			Render(" " + rankStr)
+		headerParts = append(headerParts, rankBadge)
+	}
+
+	if m.wallet != nil {
+		vp := m.wallet.VP()
+		rp := m.wallet.RP()
+		kc := m.wallet.KC()
+		walletStr := fmt.Sprintf("💰 %s VP", formatNumber(vp))
+		if rp > 0 {
+			walletStr += fmt.Sprintf("  %d RP", rp)
+		}
+		if kc > 0 {
+			walletStr += fmt.Sprintf("  %d KC", kc)
+		}
+		walletBadge := lipgloss.NewStyle().
+			Foreground(ColorUltra).
+			Bold(true).
+			Render("  " + walletStr)
+		headerParts = append(headerParts, walletBadge)
+	}
+
+	headerLine := lipgloss.JoinHorizontal(lipgloss.Center, headerParts...)
+	sb.WriteString(headerLine + "\n\n")
 
 	// ── Tabs ────────────────────────────────────────────────────
 	var tabs []string
@@ -269,7 +329,7 @@ func (m MainModel) View() string {
 	case TabNightMarket:
 		sb.WriteString(m.nightModel.View())
 	case TabBattlepass:
-		sb.WriteString(m.bpModel.View())
+		sb.WriteString(m.progressModel.View())
 	}
 
 	// ── Status Bar ──────────────────────────────────────────────
@@ -286,6 +346,28 @@ func (m MainModel) View() string {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
+
+func formatNumber(n int) string {
+	in := fmt.Sprintf("%d", n)
+	if len(in) <= 3 {
+		return in
+	}
+	var res []byte
+	offset := len(in) % 3
+	if offset > 0 {
+		res = append(res, in[:offset]...)
+		if len(in) > offset {
+			res = append(res, ',')
+		}
+	}
+	for i := offset; i < len(in); i += 3 {
+		res = append(res, in[i:i+3]...)
+		if i+3 < len(in) {
+			res = append(res, ',')
+		}
+	}
+	return string(res)
+}
 
 func (m MainModel) hasNightMarket() bool {
 	for _, t := range m.tabs {
@@ -338,23 +420,70 @@ func (m MainModel) renderError() string {
 func (m MainModel) loadData() tea.Msg {
 	client := api.NewClient(m.session)
 
+	var (
+		sf        *models.StorefrontResponse
+		sfErr     error
+		skins     []models.SkinAsset
+		skinsErr  error
+		wallet    *models.WalletResponse
+		mmr       *models.MMRResponse
+		contracts *models.ContractsResponse
+		content   *models.ContentResponse
+		ranksMap  map[int]string
+		wg        sync.WaitGroup
+	)
+
+	wg.Add(5)
+
 	// 1. Fetch storefront
-	sf, err := client.FetchStorefront()
-	if err != nil {
-		return DataLoadedMsg{Err: fmt.Errorf("storefront: %w", err)}
-	}
+	go func() {
+		defer wg.Done()
+		sf, sfErr = client.FetchStorefront()
+	}()
 
 	// 2. Load skin assets (cached)
-	skins, err := cache.LoadOrFetchSkins(m.session.ClientVersion)
-	if err != nil {
-		return DataLoadedMsg{Err: fmt.Errorf("skin cache: %w", err)}
+	go func() {
+		defer wg.Done()
+		skins, skinsErr = cache.LoadOrFetchSkins(m.session.ClientVersion)
+	}()
+
+	// 3. Fetch wallet
+	go func() {
+		defer wg.Done()
+		wallet, _ = client.FetchWallet()
+	}()
+
+	// 4. Fetch MMR
+	go func() {
+		defer wg.Done()
+		mmr, _ = client.FetchMMR()
+	}()
+
+	// 5. Fetch contracts and content
+	go func() {
+		defer wg.Done()
+		contracts, _ = client.FetchContracts()
+		content, _ = client.FetchContent()
+	}()
+
+	// Load ranks (cached)
+	ranksMap, _ = cache.LoadOrFetchRanks(m.session.ClientVersion)
+
+	wg.Wait()
+
+	if sfErr != nil {
+		return DataLoadedMsg{Err: fmt.Errorf("storefront: %w", sfErr)}
 	}
+	if skinsErr != nil {
+		return DataLoadedMsg{Err: fmt.Errorf("skin cache: %w", skinsErr)}
+	}
+
 	lookup := cache.BuildSkinLookup(skins)
 
 	// VP currency UUID
 	const vpUUID = "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741"
 
-	// 3. Resolve daily shop skins
+	// Resolve daily shop skins
 	var shopSkins []models.ResolvedSkin
 	for _, offer := range sf.SkinsPanelLayout.SingleItemStoreOffers {
 		skinID := offer.OfferID
@@ -389,7 +518,7 @@ func (m MainModel) loadData() tea.Msg {
 		})
 	}
 
-	// 4. Resolve night market (if active)
+	// Resolve night market (if active)
 	var nightSkins []models.ResolvedSkin
 	var nmDiscounts []int
 	if sf.BonusStore != nil && len(sf.BonusStore.BonusStoreOffers) > 0 {
@@ -438,12 +567,12 @@ func (m MainModel) loadData() tea.Msg {
 		}
 	}
 
-	// 5. Fetch battlepass progression
-	contracts, err := client.FetchContracts()
+	// Resolve battlepass progression & missions
 	var bpData *BattlepassData
-	if err == nil {
-		content, cerr := client.FetchContent()
-		if cerr == nil {
+	var missions []models.Mission
+	if contracts != nil {
+		missions = contracts.Missions
+		if content != nil {
 			if bp, found := api.FindActiveBattlepass(contracts, content); found {
 				bpData = &BattlepassData{
 					CurrentTier:     bp.ProgressionLevelReached,
@@ -456,11 +585,23 @@ func (m MainModel) loadData() tea.Msg {
 		}
 	}
 
+	// Determine rank name
+	rankName := "Unranked"
+	if mmr != nil {
+		tier, _ := mmr.GetCurrentCompetitiveInfo()
+		rankName = cache.GetRankName(tier, ranksMap)
+	}
+
 	return DataLoadedMsg{
 		ShopSkins:     shopSkins,
 		NightMarket:   nightSkins,
 		NMDiscounts:   nmDiscounts,
 		Battlepass:    bpData,
 		TimeRemaining: sf.SkinsPanelLayout.SingleItemOffersRemainingDurationInSeconds,
+		Wallet:        wallet,
+		MMR:           mmr,
+		RankName:      rankName,
+		Missions:      missions,
+		RanksMap:      ranksMap,
 	}
 }

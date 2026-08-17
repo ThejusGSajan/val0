@@ -98,11 +98,26 @@ type BonusStoreOffer struct {
 // ContractsResponse is the JSON returned by
 // GET https://pd.{shard}.a.pvp.net/contracts/v1/contracts/{puuid}
 type ContractsResponse struct {
-	Version               int        `json:"Version"`
-	Subject               string     `json:"Subject"`
-	Contracts             []Contract `json:"Contracts"`
-	ProcessedMatches      []any      `json:"ProcessedMatches"`
-	ActiveSpecialContract string     `json:"ActiveSpecialContract"`
+	Version               int             `json:"Version"`
+	Subject               string          `json:"Subject"`
+	Contracts             []Contract      `json:"Contracts"`
+	ProcessedMatches      []any           `json:"ProcessedMatches"`
+	ActiveSpecialContract string          `json:"ActiveSpecialContract"`
+	Missions              []Mission       `json:"Missions"`
+	MissionMetadata       MissionMetadata `json:"MissionMetadata"`
+}
+
+type Mission struct {
+	ID             string         `json:"ID"`
+	Objectives     map[string]int `json:"Objectives"`
+	Complete       bool           `json:"Complete"`
+	ExpirationTime string         `json:"ExpirationTime"`
+}
+
+type MissionMetadata struct {
+	NPECompleted     bool   `json:"NPECompleted"`
+	WeeklyCheckpoint string `json:"WeeklyCheckpoint"`
+	WeeklyRefillTime string `json:"WeeklyRefillTime"`
 }
 
 type Contract struct {
