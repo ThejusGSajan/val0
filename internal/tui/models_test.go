@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
 )
 
@@ -480,5 +481,101 @@ func TestMainModel5TabSwitching(t *testing.T) {
 	m = updated.(MainModel)
 	if m.activeTab != TabSession {
 		t.Errorf("expected TabSession, got %v", m.activeTab)
+	}
+}
+
+func TestWishlistModel(t *testing.T) {
+	wm := NewWishlistModel()
+	wm.entries = []cache.WishlistEntry{
+		{UUID: "skin-wl-1", Name: "Reaver Vandal", Rarity: "Premium", CostVP: 1775},
+		{UUID: "skin-wl-2", Name: "Prime Phantom", Rarity: "Premium", CostVP: 1775},
+	}
+	wm.SetSize(80, 24)
+
+	view := wm.View()
+	if !strings.Contains(view, "SKIN WISHLIST") {
+		t.Errorf("expected SKIN WISHLIST header, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Reaver Vandal") || !strings.Contains(view, "Prime Phantom") {
+		t.Errorf("expected wishlist entries in view, got:\n%s", view)
+	}
+
+	// Move cursor down
+	updated, _ := wm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	wm = updated
+	if wm.cursor != 1 {
+		t.Errorf("expected cursor 1 after down key, got %d", wm.cursor)
+	}
+}
+
+func TestSessionModel(t *testing.T) {
+	puuid := "player-me"
+	sm := NewSessionModel(puuid)
+	sm.SetInitialSnapshot([]string{"old-match-1", "old-match-2"})
+
+	// Add a new session match
+	newMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{MatchID: "new-match-3", MapID: "Ascent"},
+		Players: []models.MatchPlayer{
+			{
+				Subject: puuid,
+				TeamID:  "Blue",
+				Stats: models.PlayerStats{
+					Kills:        18,
+					Deaths:       12,
+					Assists:      5,
+					Score:        3600,
+					RoundsPlayed: 18,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+			{TeamID: "Red", Won: false, RoundsWon: 5},
+		},
+	}
+
+	sm.UpdateSessionMatches([]*models.MatchDetails{newMatch})
+	sm.SetSize(80, 24)
+	view := sm.View()
+
+	if !strings.Contains(view, "SESSION TRACKER") {
+		t.Errorf("expected SESSION TRACKER header, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Games Played:     1") {
+		t.Errorf("expected 1 game played in session, got:\n%s", view)
+	}
+	if !strings.Contains(view, "1W - 0L - 0D") {
+		t.Errorf("expected 1W - 0L in session, got:\n%s", view)
+	}
+}
+
+func TestShopModelWishlistToggle(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{
+			UUID:        "toggle-vandal-uuid",
+			DisplayName: "Glitchpop Vandal",
+			Rarity:      "Exclusive",
+			CostVP:      2175,
+		},
+	}
+
+	sm := NewShopModel(skins, 3600)
+	sm.SetSize(80, 24)
+
+	// Press 'w' to add to wishlist
+	updated, _ := sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	sm = updated
+
+	if !cache.IsInWishlist("toggle-vandal-uuid") {
+		t.Errorf("expected Glitchpop Vandal in wishlist after pressing 'w'")
+	}
+
+	// Press 'w' again to remove
+	updated, _ = sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	sm = updated
+
+	if cache.IsInWishlist("toggle-vandal-uuid") {
+		t.Errorf("expected Glitchpop Vandal removed from wishlist after second 'w'")
 	}
 }

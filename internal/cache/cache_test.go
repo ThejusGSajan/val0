@@ -53,3 +53,35 @@ func TestGetRankName(t *testing.T) {
 		t.Errorf("expected Unranked for tier 0, got %s", name)
 	}
 }
+
+func TestWishlistOperations(t *testing.T) {
+	entry := WishlistEntry{
+		UUID:   "test-uuid-prime-vandal",
+		Name:   "Prime Vandal",
+		CostVP: 1775,
+		Rarity: "Premium",
+	}
+
+	// Clean before test
+	_ = RemoveFromWishlist(entry.UUID)
+
+	if IsInWishlist(entry.UUID) {
+		t.Errorf("expected false before adding")
+	}
+
+	if err := AddToWishlist(entry); err != nil {
+		t.Fatalf("failed to add to wishlist: %v", err)
+	}
+
+	if !IsInWishlist(entry.UUID) {
+		t.Errorf("expected true after adding to wishlist")
+	}
+
+	if err := RemoveFromWishlist(entry.UUID); err != nil {
+		t.Fatalf("failed to remove from wishlist: %v", err)
+	}
+
+	if IsInWishlist(entry.UUID) {
+		t.Errorf("expected false after removing from wishlist")
+	}
+}

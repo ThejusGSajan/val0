@@ -86,10 +86,12 @@ type MainModel struct {
 	storeSubTab   StoreSubTab
 	shopModel     ShopModel
 	nightModel    NightMarketModel
+	wishlistModel WishlistModel
 	matchesModel  MatchesModel
 	statsModel    StatsModel
 	progressModel ProgressModel
 	bpModel       ProgressModel
+	sessionModel  SessionModel
 	session       *models.Session
 	regionModel   RegionSelectModel
 	needsRegion   bool
@@ -119,18 +121,20 @@ func NewMainModel(session *models.Session) MainModel {
 	needsRegion := session.Region == ""
 
 	return MainModel{
-		activeTab:   TabStore,
-		tabs:        tabs,
-		tabNames:    tabNames,
-		storeSubTab: SubTabShop,
-		session:     session,
-		needsRegion: needsRegion,
-		regionModel: NewRegionSelectModel(),
-		loading:     !needsRegion,
-		ranksMap:    cache.DefaultRankNames,
-		agentsMap:   cache.DefaultAgentNames,
-		mapsMap:     cache.DefaultMapNames,
-		weaponsMap:  cache.DefaultWeaponNames,
+		activeTab:     TabStore,
+		tabs:          tabs,
+		tabNames:      tabNames,
+		storeSubTab:   SubTabShop,
+		session:       session,
+		wishlistModel: NewWishlistModel(),
+		sessionModel:  NewSessionModel(session.PUUID),
+		needsRegion:   needsRegion,
+		regionModel:   NewRegionSelectModel(),
+		loading:       !needsRegion,
+		ranksMap:      cache.DefaultRankNames,
+		agentsMap:     cache.DefaultAgentNames,
+		mapsMap:       cache.DefaultMapNames,
+		weaponsMap:    cache.DefaultWeaponNames,
 	}
 }
 
@@ -154,10 +158,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.shopModel.SetSize(msg.Width, contentHeight)
 		m.nightModel.SetSize(msg.Width, contentHeight)
+		m.wishlistModel.SetSize(msg.Width, contentHeight)
 		m.matchesModel.SetSize(msg.Width, contentHeight)
 		m.statsModel.SetSize(msg.Width, contentHeight)
 		m.progressModel.SetSize(msg.Width, contentHeight)
 		m.bpModel = m.progressModel
+		m.sessionModel.SetSize(msg.Width, contentHeight)
 		m.regionModel.width = msg.Width
 		m.regionModel.height = msg.Height
 		return m, nil
@@ -222,8 +228,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.storeSubTab = SubTabShop
 				return m, nil
 			case "s":
-				// Sub-tab wishlist or navigation handled
 				m.storeSubTab = SubTabWishlist
+				m.wishlistModel.Refresh()
 				return m, nil
 			case "d":
 				if m.nightModel.HasData() {
@@ -275,6 +281,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		m.wishlistModel.Refresh()
+		m.wishlistModel.SetSize(m.width, contentHeight)
+
 		m.matchesModel = NewMatchesModel(msg.MatchItems, m.session.PUUID, msg.AgentsMap, msg.MapsMap)
 		m.matchesModel.SetSize(m.width, contentHeight)
 
@@ -284,6 +293,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.progressModel = NewProgressModel(msg.Battlepass, msg.Missions)
 		m.progressModel.SetSize(m.width, contentHeight)
 		m.bpModel = m.progressModel
+
+		var matchIDs []string
+		for _, it := range msg.MatchItems {
+			matchIDs = append(matchIDs, it.MatchID)
+		}
+		m.sessionModel.SetInitialSnapshot(matchIDs)
+		m.sessionModel.UpdateSessionMatches(msg.MatchDetails)
+		m.sessionModel.SetSize(m.width, contentHeight)
 		return m, nil
 	}
 
@@ -303,6 +320,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TabStore:
 		if m.storeSubTab == SubTabNightMarket {
 			m.nightModel, cmd = m.nightModel.Update(msg)
+		} else if m.storeSubTab == SubTabWishlist {
+			m.wishlistModel, cmd = m.wishlistModel.Update(msg)
 		} else {
 			m.shopModel, cmd = m.shopModel.Update(msg)
 		}
@@ -313,6 +332,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TabProgress:
 		m.progressModel, cmd = m.progressModel.Update(msg)
 		m.bpModel = m.progressModel
+	case TabSession:
+		m.sessionModel, cmd = m.sessionModel.Update(msg)
 	}
 	return m, cmd
 }
@@ -423,7 +444,7 @@ func (m MainModel) View() string {
 		if m.storeSubTab == SubTabNightMarket {
 			sb.WriteString(m.nightModel.View())
 		} else if m.storeSubTab == SubTabWishlist {
-			sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("  Wishlist sub-tab (Store → Wishlist)."))
+			sb.WriteString(m.wishlistModel.View())
 		} else {
 			sb.WriteString(m.shopModel.View())
 		}
@@ -434,7 +455,7 @@ func (m MainModel) View() string {
 	case TabProgress:
 		sb.WriteString(m.progressModel.View())
 	case TabSession:
-		sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("  Session tracker tab."))
+		sb.WriteString(m.sessionModel.View())
 	}
 
 	// ── Status Bar ──────────────────────────────────────────────
