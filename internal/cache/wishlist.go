@@ -91,6 +91,10 @@ func SaveWishlist(entries []WishlistEntry) error {
 		return err
 	}
 
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
 	wf := wishlistFile{Skins: entries}
 	data, err := json.MarshalIndent(wf, "", "  ")
 	if err != nil {
