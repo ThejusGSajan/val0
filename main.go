@@ -19,8 +19,6 @@ func main() {
 		var model tea.Model
 		if errors.Is(err, auth.ErrLockfileNotFound) {
 			model = tui.NewErrorModel("Please start the Riot Client first.\n(Lockfile was not found)")
-		} else if errors.Is(err, auth.ErrLockfileStale) {
-			model = tui.NewErrorModel("Please restart the Riot Client.\n(Lockfile is older than 1 hour)")
 		} else {
 			model = tui.NewErrorModel(fmt.Sprintf("Authentication failed:\n%s", err.Error()))
 		}

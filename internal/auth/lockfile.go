@@ -19,7 +19,6 @@ import (
 
 var (
 	ErrLockfileNotFound = errors.New("lockfile not found — please start the Riot Client")
-	ErrLockfileStale    = errors.New("lockfile is stale (>1 hour) — please restart the Riot Client")
 )
 
 // lockfilePath returns the absolute path to the Riot Client lockfile.
@@ -29,7 +28,7 @@ func lockfilePath() string {
 }
 
 // ReadLockfile reads and validates the lockfile.
-// Returns ErrLockfileNotFound if absent, ErrLockfileStale if older than 1h.
+// Returns ErrLockfileNotFound if absent.
 func ReadLockfile() (*models.Lockfile, error) {
 	path := lockfilePath()
 
@@ -39,11 +38,6 @@ func ReadLockfile() (*models.Lockfile, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("stat lockfile: %w", err)
-	}
-
-	// Constraint: reject if modification time > 1 hour ago.
-	if time.Since(info.ModTime()) > time.Hour {
-		return nil, ErrLockfileStale
 	}
 
 	data, err := os.ReadFile(path)
@@ -69,6 +63,28 @@ func parseLockfile(raw string, modTime time.Time) (*models.Lockfile, error) {
 		Protocol: parts[4],
 		ModTime:  modTime,
 	}, nil
+}
+
+// ProbeLiveness attempts a lightweight GET to the local Riot Client.
+// Returns nil if the client is alive, or an error if unreachable.
+func ProbeLiveness(lf *models.Lockfile) error {
+	url := fmt.Sprintf("https://127.0.0.1:%s/entitlements/v1/token", lf.Port)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("build probe request: %w", err)
+	}
+	req.Header.Set("Authorization", basicAuth(lf.Password))
+
+	resp, err := insecureClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("riot client not reachable — please start the Riot Client: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("riot client returned status %d — please restart the Riot Client", resp.StatusCode)
+	}
+	return nil
 }
 
 // ── Token Extraction ────────────────────────────────────────────────
@@ -275,6 +291,11 @@ func probeActiveShard(accessToken, puuid string) string {
 func BuildSession() (*models.Session, error) {
 	lf, err := ReadLockfile()
 	if err != nil {
+		return nil, err
+	}
+
+	// Verify the Riot Client process is actually running
+	if err := ProbeLiveness(lf); err != nil {
 		return nil, err
 	}
 

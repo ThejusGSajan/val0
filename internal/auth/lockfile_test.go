@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/val-tracker/val-tracker/internal/models"
 )
 
 func TestParseLockfile(t *testing.T) {
@@ -41,32 +45,53 @@ func TestParseLockfile_Malformed(t *testing.T) {
 	}
 }
 
-func TestReadLockfile_Stale(t *testing.T) {
-	tempDir := t.TempDir()
-	// Set LOCALAPPDATA to temp dir to test stale check
-	origLocalApp := os.Getenv("LOCALAPPDATA")
-	defer os.Setenv("LOCALAPPDATA", origLocalApp)
-	os.Setenv("LOCALAPPDATA", tempDir)
+func TestProbeLiveness(t *testing.T) {
+	// 1. Success case (HTTP 200)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/entitlements/v1/token" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
 
-	lockDir := filepath.Join(tempDir, "Riot Games", "Riot Client", "Config")
-	if err := os.MkdirAll(lockDir, 0o755); err != nil {
-		t.Fatal(err)
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatalf("parse test server url: %v", err)
 	}
 
-	lockPath := filepath.Join(lockDir, "lockfile")
-	if err := os.WriteFile(lockPath, []byte("Riot Client:123:456:pwd:https"), 0o644); err != nil {
-		t.Fatal(err)
+	lf := &models.Lockfile{
+		Port:     u.Port(),
+		Password: "testpassword",
 	}
 
-	// Change modtime to 2 hours ago
-	oldTime := time.Now().Add(-2 * time.Hour)
-	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
-		t.Fatal(err)
+	if err := ProbeLiveness(lf); err != nil {
+		t.Errorf("expected ProbeLiveness to succeed, got: %v", err)
 	}
 
-	_, err := ReadLockfile()
-	if err != ErrLockfileStale {
-		t.Errorf("expected ErrLockfileStale, got: %v", err)
+	// 2. Error case (HTTP 500)
+	tsError := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer tsError.Close()
+
+	uError, _ := url.Parse(tsError.URL)
+	lfError := &models.Lockfile{
+		Port:     uError.Port(),
+		Password: "testpassword",
+	}
+	if err := ProbeLiveness(lfError); err == nil {
+		t.Errorf("expected ProbeLiveness to fail on HTTP 500, got nil")
+	}
+
+	// 3. Unreachable case
+	lfUnreachable := &models.Lockfile{
+		Port:     "1", // unreachable port
+		Password: "testpassword",
+	}
+	if err := ProbeLiveness(lfUnreachable); err == nil {
+		t.Errorf("expected ProbeLiveness to fail on unreachable port, got nil")
 	}
 }
 
