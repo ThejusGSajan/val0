@@ -28,6 +28,9 @@ func (m NightMarketModel) Update(msg tea.Msg) (NightMarketModel, tea.Cmd) {
 }
 
 func (m NightMarketModel) View() string {
+	if m.width == 0 {
+		return ""
+	}
 	if len(m.skins) == 0 {
 		return lipgloss.NewStyle().
 			Foreground(ColorMuted).

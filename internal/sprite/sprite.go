@@ -43,11 +43,6 @@ func Render(iconURL string, width int) string {
 		return ""
 	}
 
-	height := int(float64(width) * 0.45)
-	if height < 1 {
-		height = 1
-	}
-
 	cacheKey := fmt.Sprintf("%s:%d", iconURL, width)
 
 	spriteMutex.Lock()
@@ -62,11 +57,15 @@ func Render(iconURL string, width int) string {
 		return ""
 	}
 
-	// Resize: width columns, height*2 actual pixel rows
-	// (each terminal row encodes 2 pixel rows via half-blocks).
+	// Resize the image while preserving aspect ratio
+	// By passing 0 for height, nfnt/resize automatically calculates the height
+	// to maintain the original image's proportions.
+	// Since each terminal cell renders two vertical pixels (using half-blocks)
+	// and terminal cells are approximately 1:2 aspect ratio, a half-block is a perfect 1:1 square.
+	// Thus, resizing the image in normal pixels translates perfectly to terminal cells.
 	resized := resize.Resize(
 		uint(width),
-		uint(height*2),
+		0, // Preserve aspect ratio
 		img,
 		resize.Lanczos3,
 	)

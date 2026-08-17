@@ -71,6 +71,9 @@ func (m ShopModel) Update(msg tea.Msg) (ShopModel, tea.Cmd) {
 }
 
 func (m ShopModel) View() string {
+	if m.width == 0 {
+		return ""
+	}
 	if len(m.skins) == 0 {
 		return lipgloss.NewStyle().
 			Foreground(ColorMuted).
@@ -188,6 +191,9 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		spr = skin.Sprite
 	}
 
+	const spriteTargetRows = 8 // fixed height for all sprite containers
+	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth)
+
 	if spr != "" {
 		content.WriteString(spr)
 		content.WriteString("\n")
@@ -223,4 +229,36 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		BorderForeground(borderCol).
 		Width(cardWidth).
 		Render(content.String())
+}
+
+// padSpriteToHeight ensures the sprite string occupies exactly `targetRows` lines.
+// If the sprite has fewer lines, blank lines are prepended (top-padding) to vertically center it.
+// If the sprite has more lines, it is truncated from the bottom.
+func padSpriteToHeight(spr string, targetRows int, width int) string {
+	if spr == "" {
+		// Return empty box of targetRows × width spaces
+		emptyLine := strings.Repeat(" ", width)
+		lines := make([]string, targetRows)
+		for i := range lines {
+			lines[i] = emptyLine
+		}
+		return strings.Join(lines, "\n")
+	}
+	lines := strings.Split(strings.TrimRight(spr, "\n"), "\n")
+	if len(lines) > targetRows {
+		lines = lines[:targetRows]
+	}
+	// Center vertically
+	topPad := (targetRows - len(lines)) / 2
+	bottomPad := targetRows - len(lines) - topPad
+	emptyLine := strings.Repeat(" ", width)
+	var result []string
+	for i := 0; i < topPad; i++ {
+		result = append(result, emptyLine)
+	}
+	result = append(result, lines...)
+	for i := 0; i < bottomPad; i++ {
+		result = append(result, emptyLine)
+	}
+	return strings.Join(result, "\n")
 }

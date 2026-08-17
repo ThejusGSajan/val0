@@ -653,7 +653,7 @@ func (m MainModel) loadData() tea.Msg {
 			Rarity:      RarityNameMap[tierUUID],
 			CostVP:      offer.Cost[vpUUID],
 			IconURL:     iconURL,
-			Sprite:      sprite.Render(iconURL, 40),
+			Sprite:      "", // Sprites are rendered dynamically by ShopModel.View() using current terminal width
 		})
 	}
 
@@ -699,7 +699,7 @@ func (m MainModel) loadData() tea.Msg {
 				Rarity:      RarityNameMap[tierUUID],
 				CostVP:      cost,
 				IconURL:     iconURL,
-				Sprite:      sprite.Render(iconURL, 40),
+				Sprite:      "", // Sprites are rendered dynamically
 			})
 			nmDiscounts = append(nmDiscounts, bo.DiscountPercent)
 		}

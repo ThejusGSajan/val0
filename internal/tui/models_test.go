@@ -28,6 +28,7 @@ func TestShopModelView(t *testing.T) {
 	}
 
 	model := NewShopModel(skins, 3600)
+	model.SetSize(100, 30)
 	view := model.View()
 
 	if !strings.Contains(view, "Prime Vandal") {
@@ -53,6 +54,7 @@ func TestNightMarketModelView(t *testing.T) {
 	discounts := []int{40}
 
 	model := NewNightMarketModel(skins, discounts)
+	model.SetSize(100, 30)
 	view := model.View()
 
 	if !strings.Contains(view, "NIGHT MARKET") {
@@ -64,6 +66,7 @@ func TestNightMarketModelView(t *testing.T) {
 
 	// Empty case
 	emptyModel := NewNightMarketModel(nil, nil)
+	emptyModel.SetSize(100, 30)
 	emptyView := emptyModel.View()
 	if !strings.Contains(emptyView, "not currently active") {
 		t.Errorf("expected inactive notice for empty Night Market, got:\n%s", emptyView)
