@@ -195,9 +195,11 @@ func (m StatsModel) View() string {
 		Render(fmt.Sprintf("  🎯 AGENT PERFORMANCE                                    Last %d matches", len(m.hsHistory)))
 	sections = append(sections, sec1Header)
 	sections = append(sections, "  "+strings.Repeat("─", lineWidth))
+	agentHeaderRow := fmt.Sprintf("  %-10s  %5s    %4s   %4s   %4s   %4s   %4s",
+		"Agent", "Games", "Win%", "K/D", "ACS", "ADR", "HS%")
 	sections = append(sections, lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Agent       Matches   Win%    K/D     ACS    ADR    HS%"))
+		Render(agentHeaderRow))
 
 	if len(m.agentStats) == 0 {
 		sections = append(sections, "  No agent data available.")
@@ -241,9 +243,10 @@ func (m StatsModel) View() string {
 		Render("  🔫 WEAPON STATS")
 	sections = append(sections, sec2Header)
 	sections = append(sections, "  "+strings.Repeat("─", lineWidth))
+	weaponHeaderRow := fmt.Sprintf("  %-13s  %s", "Weapon", "Kills")
 	sections = append(sections, lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Weapon         Kills"))
+		Render(weaponHeaderRow))
 
 	if len(m.weaponStats) == 0 {
 		sections = append(sections, "  No weapon data available.")

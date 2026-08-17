@@ -285,7 +285,7 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 	headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s\n",
 		"Player", "Agent", "ACS", "K", "D", "A", "HS%", "ADR", "Econ")
 	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow))
-	sb.WriteString("  " + strings.Repeat("─", 68) + "\n")
+	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
 
 	for _, p := range d.Players {
 		if strings.EqualFold(p.TeamID, teamID) {
@@ -338,7 +338,7 @@ func (m MatchesModel) renderRoundTimeline(d *models.MatchDetails, myTeamID strin
 
 	var sb strings.Builder
 	sb.WriteString(lipgloss.NewStyle().Foreground(ColorFg).Bold(true).Render("  ROUND TIMELINE\n"))
-	sb.WriteString("  " + strings.Repeat("─", 68) + "\n  ")
+	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n  ")
 
 	for i, r := range d.RoundResults {
 		won := strings.EqualFold(r.WinningTeam, myTeamID)
