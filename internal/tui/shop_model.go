@@ -74,13 +74,13 @@ func (m ShopModel) View() string {
 	// Dynamic sizing calculation
 	cardWidth := 44
 	if m.width > 0 {
-		cardWidth = (m.width / 2) - 3
+		cardWidth = int(float64(m.width/2) * 0.6)
 	}
-	if cardWidth > 60 {
-		cardWidth = 60
+	if cardWidth > 45 {
+		cardWidth = 45
 	}
-	if cardWidth < 30 {
-		cardWidth = 30
+	if cardWidth < 25 {
+		cardWidth = 25
 	}
 	spriteW := cardWidth - 4
 
@@ -148,7 +148,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		spr = skin.Sprite
 	}
 
-	const spriteTargetRows = 8 // fixed height for all sprite containers
+	const spriteTargetRows = 6 // fixed height for all sprite containers
 	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth)
 
 	if spr != "" {
