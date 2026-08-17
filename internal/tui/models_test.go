@@ -588,33 +588,26 @@ func TestSessionModel(t *testing.T) {
 	}
 }
 
-func TestShopModelWishlistToggle(t *testing.T) {
-	skins := []models.ResolvedSkin{
-		{
-			UUID:        "toggle-vandal-uuid",
-			DisplayName: "Glitchpop Vandal",
-			Rarity:      "Exclusive",
-			CostVP:      2175,
-		},
+func TestShopModelWishlistRendering(t *testing.T) {
+	skin := models.ResolvedSkin{
+		UUID:        "toggle-vandal-uuid",
+		DisplayName: "Glitchpop Vandal",
+		Rarity:      "Exclusive",
+		CostVP:      2175,
 	}
 
-	sm := NewShopModel(skins, 3600)
+	_ = cache.AddToWishlist(cache.ConvertResolvedSkinToWishlist(skin))
+	defer cache.RemoveFromWishlist(skin.UUID)
+
+	sm := NewShopModel([]models.ResolvedSkin{skin}, 3600)
 	sm.SetSize(80, 24)
 
-	// Press 'w' to add to wishlist
-	updated, _ := sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
-	sm = updated
-
-	if !cache.IsInWishlist("toggle-vandal-uuid") {
-		t.Errorf("expected Glitchpop Vandal in wishlist after pressing 'w'")
+	view := sm.View()
+	if !strings.Contains(view, "WISHLIST MATCH") {
+		t.Errorf("expected WISHLIST MATCH banner in view, got:\n%s", view)
 	}
-
-	// Press 'w' again to remove
-	updated, _ = sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
-	sm = updated
-
-	if cache.IsInWishlist("toggle-vandal-uuid") {
-		t.Errorf("expected Glitchpop Vandal removed from wishlist after second 'w'")
+	if !strings.Contains(view, "Press 's' to enter wishlist tab") {
+		t.Errorf("expected help text in view, got:\n%s", view)
 	}
 }
 

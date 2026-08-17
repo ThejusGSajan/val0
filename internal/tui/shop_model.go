@@ -15,10 +15,8 @@ import (
 type ShopModel struct {
 	skins         []models.ResolvedSkin
 	timeRemaining int // seconds
-	cursor        int
 	width         int
 	height        int
-	flashMsg      string
 }
 
 func NewShopModel(skins []models.ResolvedSkin, timeRemaining int) ShopModel {
@@ -31,42 +29,6 @@ func (m *ShopModel) SetSize(w, h int) {
 }
 
 func (m ShopModel) Update(msg tea.Msg) (ShopModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "left", "h":
-			if m.cursor > 0 {
-				m.cursor--
-				m.flashMsg = ""
-			}
-		case "right", "l":
-			if m.cursor < len(m.skins)-1 {
-				m.cursor++
-				m.flashMsg = ""
-			}
-		case "up", "k":
-			if m.cursor >= 2 {
-				m.cursor -= 2
-				m.flashMsg = ""
-			}
-		case "down", "j":
-			if m.cursor+2 < len(m.skins) {
-				m.cursor += 2
-				m.flashMsg = ""
-			}
-		case "w":
-			if len(m.skins) > 0 && m.cursor < len(m.skins) {
-				selected := m.skins[m.cursor]
-				if cache.IsInWishlist(selected.UUID) {
-					_ = cache.RemoveFromWishlist(selected.UUID)
-					m.flashMsg = fmt.Sprintf("Removed %s from wishlist.", selected.DisplayName)
-				} else {
-					_ = cache.AddToWishlist(cache.ConvertResolvedSkinToWishlist(selected))
-					m.flashMsg = fmt.Sprintf("⭐ Added %s to wishlist!", selected.DisplayName)
-				}
-			}
-		}
-	}
 	return m, nil
 }
 
@@ -100,10 +62,6 @@ func (m ShopModel) View() string {
 		sb.WriteString("  " + banner + "\n\n")
 	}
 
-	if m.flashMsg != "" {
-		sb.WriteString(lipgloss.NewStyle().Foreground(ColorWin).Bold(true).Render("  ✔ "+m.flashMsg) + "\n\n")
-	}
-
 	// Timer
 	hours := m.timeRemaining / 3600
 	minutes := (m.timeRemaining % 3600) / 60
@@ -128,10 +86,9 @@ func (m ShopModel) View() string {
 
 	// Render each skin as a card
 	var cards []string
-	for i, skin := range m.skins {
-		isSelected := (i == m.cursor)
+	for _, skin := range m.skins {
 		inWishlist := cache.IsInWishlist(skin.UUID)
-		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardWidth, spriteW, isSelected, inWishlist))
+		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardWidth, spriteW, inWishlist))
 	}
 
 	// Layout: 2 × 2 grid if we have 4 skins (the standard daily shop)
@@ -150,17 +107,17 @@ func (m ShopModel) View() string {
 
 	sb.WriteString(lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Arrow keys select skin  •  Press 'w' to add/remove selected skin from wishlist"))
+		Render("  Press 's' to enter wishlist tab"))
 
 	return sb.String()
 }
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
 func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int) string {
-	return renderSkinCardWithWishlist(skin, discountPct, cardWidth, spriteWidth, false, false)
+	return renderSkinCardWithWishlist(skin, discountPct, cardWidth, spriteWidth, false)
 }
 
-func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int, isSelected bool, inWishlist bool) string {
+func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int, inWishlist bool) string {
 	// Get rarity color
 	rarityColor := ColorMuted
 	for uuid, name := range RarityNameMap {
@@ -223,9 +180,6 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 	borderCol := rarityColor
 	if inWishlist {
 		borderCol = ColorUltra // Gold border for wishlist matches
-	}
-	if isSelected {
-		borderCol = lipgloss.Color("#FFFFFF") // White border for cursor selection
 	}
 
 	return CardStyle.
