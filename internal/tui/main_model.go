@@ -611,7 +611,7 @@ func (m MainModel) loadData() tea.Msg {
 	// 6. Fetch Match History
 	go func() {
 		defer wg.Done()
-		matchHist, _ = client.FetchMatchHistory(0, 20, "")
+		matchHist, _ = client.FetchMatchHistory(0, 10, "")
 	}()
 
 	// 7. Fetch Competitive Updates
@@ -776,6 +776,40 @@ func (m MainModel) loadData() tea.Msg {
 			matchDetails = append(matchDetails, d)
 		}
 
+		// Collect all unique PUUIDs from all match details
+		puuidSet := make(map[string]bool)
+		for _, d := range matchDetails {
+			for _, p := range d.Players {
+				puuidSet[p.Subject] = true
+			}
+		}
+		var allPUUIDs []string
+		for puuid := range puuidSet {
+			allPUUIDs = append(allPUUIDs, puuid)
+		}
+
+		// Resolve names
+		playerNames, _ := client.FetchPlayerNames(allPUUIDs)
+
+		// Inject resolved names into MatchDetails players
+		if playerNames != nil {
+			for _, d := range matchDetails {
+				for i := range d.Players {
+					p := &d.Players[i]
+					if p.GameName == "" {
+						if resolvedName, ok := playerNames[p.Subject]; ok {
+							// resolvedName is "GameName#TagLine"
+							parts := strings.SplitN(resolvedName, "#", 2)
+							p.GameName = parts[0]
+							if len(parts) > 1 {
+								p.TagLine = parts[1]
+							}
+						}
+					}
+				}
+			}
+		}
+
 		// Build RR update map by matchID
 		rrMap := make(map[string]int)
 		if compUpdates != nil {
@@ -804,11 +838,7 @@ func (m MainModel) loadData() tea.Msg {
 			if hasDetail && d != nil {
 				item.Details = d
 				item.MapName = cache.GetMapName(d.MatchInfo.MapID, mapsMap)
-				if d.MatchInfo.IsRanked || strings.EqualFold(d.MatchInfo.QueueID, "competitive") {
-					item.QueueName = "Competitive"
-				} else if d.MatchInfo.QueueID != "" {
-					item.QueueName = strings.Title(d.MatchInfo.QueueID)
-				}
+				item.QueueName = GetQueueDisplayName(d.MatchInfo.QueueID)
 				item.Outcome = d.GetMatchOutcome(m.session.PUUID)
 				item.Score = d.ScoreString(m.session.PUUID)
 

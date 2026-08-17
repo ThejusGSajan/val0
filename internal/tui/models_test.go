@@ -617,3 +617,73 @@ func TestShopModelWishlistToggle(t *testing.T) {
 		t.Errorf("expected Glitchpop Vandal removed from wishlist after second 'w'")
 	}
 }
+
+func TestGetQueueDisplayName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"competitive", "Competitive"},
+		{"unrated", "Unrated"},
+		{"deathmatch", "Deathmatch"},
+		{"spikerush", "Spike Rush"},
+		{"swiftplay", "Swiftplay"},
+		{"hurm", "Team Deathmatch"},
+		{"ggteam", "Escalation"},
+		{"onefa", "Replication"},
+		{"snowball", "Snowball Fight"},
+		{"newmap", "New Map"},
+		{"custom", "Custom"},
+		{"", "Unknown"},
+		{"premier", "Premier"},
+	}
+
+	for _, tt := range tests {
+		got := GetQueueDisplayName(tt.input)
+		if got != tt.expected {
+			t.Errorf("GetQueueDisplayName(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestMatchesModelPlayerNames(t *testing.T) {
+	puuid := "my-puuid"
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{MatchID: "m-names", MapID: "Ascent"},
+		Players: []models.MatchPlayer{
+			{Subject: puuid, TeamID: "Blue", GameName: "MyName", TagLine: "123"},
+			{Subject: "other-puuid-1", TeamID: "Blue", GameName: "Friend", TagLine: "TAG"},
+			{Subject: "other-puuid-2", TeamID: "Blue", GameName: "", TagLine: ""}, // hidden
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+			{TeamID: "Red", Won: false, RoundsWon: 5},
+		},
+	}
+
+	items := []MatchItem{
+		{
+			MatchID:     "m-names",
+			Details:     details,
+			PlayerPUUID: puuid,
+		},
+	}
+
+	mm := NewMatchesModel(items, puuid, nil, nil)
+	mm.SetSize(100, 30)
+	mm.viewMode = MatchViewDetail
+
+	view := mm.View()
+	if !strings.Contains(view, "▸ You") {
+		t.Errorf("expected '▸ You' for player's own row, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Friend#TAG") {
+		t.Errorf("expected 'Friend#TAG' for resolved player name, got:\n%s", view)
+	}
+	if !strings.Contains(view, "<Hidden>") {
+		t.Errorf("expected '<Hidden>' for streamer mode / unresolved name, got:\n%s", view)
+	}
+	if strings.Contains(view, "other-puuid-2") {
+		t.Errorf("UUID should never be displayed in view, got:\n%s", view)
+	}
+}

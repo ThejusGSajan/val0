@@ -282,22 +282,25 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 
 	sb.WriteString(lipgloss.NewStyle().Foreground(teamColor).Bold(true).Render(teamLabel))
 	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf(" — %d rounds\n", roundsWon)))
-	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("  Player               Agent      ACS    K   D   A    HS%    ADR   Econ\n"))
+	headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s\n",
+		"Player", "Agent", "ACS", "K", "D", "A", "HS%", "ADR", "Econ")
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow))
 	sb.WriteString("  " + strings.Repeat("─", 68) + "\n")
 
 	for _, p := range d.Players {
 		if strings.EqualFold(p.TeamID, teamID) {
-			name := p.GameName
-			if name == "" {
-				name = p.Subject
-				if len(name) > 12 {
-					name = name[:12]
-				}
-			} else if p.TagLine != "" {
-				name = fmt.Sprintf("%s#%s", p.GameName, p.TagLine)
-			}
+			name := ""
 			if p.Subject == m.playerPUUID {
 				name = "▸ You"
+			} else if p.GameName != "" {
+				if p.TagLine != "" {
+					name = fmt.Sprintf("%s#%s", p.GameName, p.TagLine)
+				} else {
+					name = p.GameName
+				}
+			} else {
+				// Name Service returned nothing → player has hidden their name
+				name = "<Hidden>"
 			}
 
 			agentName := "Agent"
