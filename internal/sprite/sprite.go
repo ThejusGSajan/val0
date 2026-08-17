@@ -13,13 +13,6 @@ import (
 	"github.com/nfnt/resize"
 )
 
-const (
-	// Target sprite dimensions in terminal "pixels" (columns × half-rows).
-	// Each cell uses a Unicode half-block so 1 char = 2 vertical pixels.
-	SpriteWidth  = 40 // columns
-	SpriteHeight = 10 // character rows (= 20 real pixel rows)
-)
-
 // spriteCache prevents re-downloading the same icon within a session.
 var (
 	spriteMap   = make(map[string]string)
@@ -29,17 +22,36 @@ var (
 // Render downloads the PNG at iconURL and converts it into an ANSI
 // block-character string suitable for terminal display.
 //
+// The width parameter controls columns; height is computed proportionally
+// with a 0.45 aspect ratio (weapon icons are landscape-oriented, ~3:1 aspect).
+//
+// Width is clamped to a maximum of 55. If width < 20, Render returns an empty string.
+//
 // Uses the Unicode UPPER HALF BLOCK (▀) with foreground = top pixel,
 // background = bottom pixel, achieving 2× vertical resolution.
 //
 // Returns empty string on any error (graceful degradation).
-func Render(iconURL string) string {
+func Render(iconURL string, width int) string {
 	if iconURL == "" {
 		return ""
 	}
 
+	if width > 55 {
+		width = 55
+	}
+	if width < 20 {
+		return ""
+	}
+
+	height := int(float64(width) * 0.45)
+	if height < 1 {
+		height = 1
+	}
+
+	cacheKey := fmt.Sprintf("%s:%d", iconURL, width)
+
 	spriteMutex.Lock()
-	if cached, ok := spriteMap[iconURL]; ok {
+	if cached, ok := spriteMap[cacheKey]; ok {
 		spriteMutex.Unlock()
 		return cached
 	}
@@ -50,11 +62,11 @@ func Render(iconURL string) string {
 		return ""
 	}
 
-	// Resize: SpriteWidth columns, SpriteHeight*2 actual pixel rows
+	// Resize: width columns, height*2 actual pixel rows
 	// (each terminal row encodes 2 pixel rows via half-blocks).
 	resized := resize.Resize(
-		uint(SpriteWidth),
-		uint(SpriteHeight*2),
+		uint(width),
+		uint(height*2),
 		img,
 		resize.Lanczos3,
 	)
@@ -62,7 +74,7 @@ func Render(iconURL string) string {
 	result := renderHalfBlocks(resized)
 
 	spriteMutex.Lock()
-	spriteMap[iconURL] = result
+	spriteMap[cacheKey] = result
 	spriteMutex.Unlock()
 
 	return result

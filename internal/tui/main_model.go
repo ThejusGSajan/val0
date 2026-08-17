@@ -98,6 +98,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		headerHeight := 5
+		contentHeight := msg.Height - headerHeight
+		if contentHeight < 0 {
+			contentHeight = 0
+		}
+		m.shopModel.SetSize(msg.Width, contentHeight)
+		m.nightModel.SetSize(msg.Width, contentHeight)
 		m.regionModel.width = msg.Width
 		m.regionModel.height = msg.Height
 		return m, nil
@@ -167,10 +174,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 
 		// Update sub-models
+		headerHeight := 5
+		contentHeight := m.height - headerHeight
+		if contentHeight < 0 {
+			contentHeight = 0
+		}
+
 		m.shopModel = NewShopModel(msg.ShopSkins, msg.TimeRemaining)
+		m.shopModel.SetSize(m.width, contentHeight)
 
 		if msg.NightMarket != nil && len(msg.NightMarket) > 0 {
 			m.nightModel = NewNightMarketModel(msg.NightMarket, msg.NMDiscounts)
+			m.nightModel.SetSize(m.width, contentHeight)
 			if !m.hasNightMarket() {
 				m.tabs = []Tab{TabShop, TabNightMarket, TabBattlepass}
 			}
@@ -370,7 +385,7 @@ func (m MainModel) loadData() tea.Msg {
 			Rarity:      RarityNameMap[tierUUID],
 			CostVP:      offer.Cost[vpUUID],
 			IconURL:     iconURL,
-			Sprite:      sprite.Render(iconURL),
+			Sprite:      sprite.Render(iconURL, 40),
 		})
 	}
 
@@ -417,7 +432,7 @@ func (m MainModel) loadData() tea.Msg {
 				Rarity:      RarityNameMap[tierUUID],
 				CostVP:      cost,
 				IconURL:     iconURL,
-				Sprite:      sprite.Render(iconURL),
+				Sprite:      sprite.Render(iconURL, 40),
 			})
 			nmDiscounts = append(nmDiscounts, bo.DiscountPercent)
 		}

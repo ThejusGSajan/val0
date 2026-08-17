@@ -10,10 +10,17 @@ import (
 type NightMarketModel struct {
 	skins     []models.ResolvedSkin
 	discounts []int // parallel to skins, e.g. [30, 25, 40, ...]
+	width     int
+	height    int
 }
 
 func NewNightMarketModel(skins []models.ResolvedSkin, discounts []int) NightMarketModel {
 	return NightMarketModel{skins: skins, discounts: discounts}
+}
+
+func (m *NightMarketModel) SetSize(w, h int) {
+	m.width = w
+	m.height = h
 }
 
 func (m NightMarketModel) Update(msg tea.Msg) (NightMarketModel, tea.Cmd) {
@@ -32,19 +39,35 @@ func (m NightMarketModel) View() string {
 		Bold(true).
 		Render("  ✦ NIGHT MARKET ✦")
 
+	cols := 2
+	if m.width >= 140 {
+		cols = 3
+	}
+	cardWidth := 44
+	if m.width > 0 {
+		cardWidth = (m.width / cols) - 3
+	}
+	if cardWidth > 60 {
+		cardWidth = 60
+	}
+	if cardWidth < 30 {
+		cardWidth = 30
+	}
+	spriteW := cardWidth - 4
+
 	var cards []string
 	for i, skin := range m.skins {
 		disc := 0
 		if i < len(m.discounts) {
 			disc = m.discounts[i]
 		}
-		cards = append(cards, renderSkinCard(skin, disc))
+		cards = append(cards, renderSkinCard(skin, disc, cardWidth, spriteW))
 	}
 
-	// Night market has 6 items — 3 × 2 grid or 2x3
+	// Night market has 6 items — cols x rows grid
 	var rows []string
-	for i := 0; i < len(cards); i += 2 {
-		end := i + 2
+	for i := 0; i < len(cards); i += cols {
+		end := i + cols
 		if end > len(cards) {
 			end = len(cards)
 		}

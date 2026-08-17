@@ -33,8 +33,15 @@ func TestRenderHalfBlocks(t *testing.T) {
 }
 
 func TestRender_EmptyURL(t *testing.T) {
-	res := Render("")
+	res := Render("", 40)
 	if res != "" {
 		t.Errorf("expected empty string for empty URL, got: %s", res)
+	}
+}
+
+func TestRender_WidthTooSmall(t *testing.T) {
+	res := Render("https://example.com/icon.png", 15)
+	if res != "" {
+		t.Errorf("expected empty string for width < 20, got: %s", res)
 	}
 }

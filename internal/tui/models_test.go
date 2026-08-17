@@ -69,6 +69,32 @@ func TestNightMarketModelView(t *testing.T) {
 	}
 }
 
+func TestShopModel_ResponsiveSetSize(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{UUID: "s1", DisplayName: "Vandal 1", CostVP: 1775},
+		{UUID: "s2", DisplayName: "Vandal 2", CostVP: 1775},
+	}
+	m := NewShopModel(skins, 1800)
+	m.SetSize(120, 30)
+	view := m.View()
+	if !strings.Contains(view, "Vandal 1") || !strings.Contains(view, "Vandal 2") {
+		t.Errorf("expected skins in responsive view, got:\n%s", view)
+	}
+}
+
+func TestNightMarketModel_ResponsiveSetSize(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{UUID: "nm1", DisplayName: "Phantom 1", CostVP: 1500},
+		{UUID: "nm2", DisplayName: "Phantom 2", CostVP: 1200},
+	}
+	m := NewNightMarketModel(skins, []int{20, 30})
+	m.SetSize(160, 40) // width >= 140 triggers 3-column layout
+	view := m.View()
+	if !strings.Contains(view, "Phantom 1") || !strings.Contains(view, "Phantom 2") {
+		t.Errorf("expected skins in wide Night Market view, got:\n%s", view)
+	}
+}
+
 func TestBattlepassModelView(t *testing.T) {
 	data := &BattlepassData{
 		CurrentTier:     30,

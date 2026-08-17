@@ -8,15 +8,23 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/val-tracker/val-tracker/internal/sprite"
 )
 
 type ShopModel struct {
 	skins         []models.ResolvedSkin
 	timeRemaining int // seconds
+	width         int
+	height        int
 }
 
 func NewShopModel(skins []models.ResolvedSkin, timeRemaining int) ShopModel {
 	return ShopModel{skins: skins, timeRemaining: timeRemaining}
+}
+
+func (m *ShopModel) SetSize(w, h int) {
+	m.width = w
+	m.height = h
 }
 
 func (m ShopModel) Update(msg tea.Msg) (ShopModel, tea.Cmd) {
@@ -38,10 +46,23 @@ func (m ShopModel) View() string {
 		Bold(true).
 		Render(fmt.Sprintf("  ⏱  Resets in %dh %dm", hours, minutes))
 
+	// Dynamic sizing calculation
+	cardWidth := 44
+	if m.width > 0 {
+		cardWidth = (m.width / 2) - 3
+	}
+	if cardWidth > 60 {
+		cardWidth = 60
+	}
+	if cardWidth < 30 {
+		cardWidth = 30
+	}
+	spriteW := cardWidth - 4
+
 	// Render each skin as a card
 	var cards []string
 	for _, skin := range m.skins {
-		cards = append(cards, renderSkinCard(skin, -1))
+		cards = append(cards, renderSkinCard(skin, -1, cardWidth, spriteW))
 	}
 
 	// Layout: 2 × 2 grid if we have 4 skins (the standard daily shop)
@@ -61,7 +82,7 @@ func (m ShopModel) View() string {
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
 // discountPct < 0 means no discount (regular shop). >= 0 means Night Market.
-func renderSkinCard(skin models.ResolvedSkin, discountPct int) string {
+func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int) string {
 	// Get rarity color
 	rarityColor := ColorMuted
 	for uuid, name := range RarityNameMap {
@@ -79,9 +100,16 @@ func renderSkinCard(skin models.ResolvedSkin, discountPct int) string {
 	// Build card content
 	var content strings.Builder
 
-	// ANSI sprite (if available)
-	if skin.Sprite != "" {
-		content.WriteString(skin.Sprite)
+	// ANSI sprite (if available or dynamically rendered)
+	spr := ""
+	if skin.IconURL != "" && spriteWidth >= 20 {
+		spr = sprite.Render(skin.IconURL, spriteWidth)
+	} else if skin.Sprite != "" {
+		spr = skin.Sprite
+	}
+
+	if spr != "" {
+		content.WriteString(spr)
 		content.WriteString("\n")
 	}
 
@@ -102,8 +130,12 @@ func renderSkinCard(skin models.ResolvedSkin, discountPct int) string {
 	}
 	content.WriteString(VPBadgeStyle.Render(priceStr))
 
+	if cardWidth <= 0 {
+		cardWidth = 44
+	}
+
 	return CardStyle.
 		BorderForeground(rarityColor).
-		Width(44).
+		Width(cardWidth).
 		Render(content.String())
 }
