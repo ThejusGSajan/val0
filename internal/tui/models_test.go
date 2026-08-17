@@ -162,22 +162,22 @@ func TestMainModelTabNavigation(t *testing.T) {
 	}
 
 	m := NewMainModel(session)
-	if m.activeTab != TabShop {
-		t.Errorf("expected initial activeTab TabShop, got %v", m.activeTab)
+	if m.activeTab != TabStore {
+		t.Errorf("expected initial activeTab TabStore, got %v", m.activeTab)
 	}
 
-	// Next tab -> Battlepass
+	// Next tab -> Matches
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
 	m = updated.(MainModel)
-	if m.activeTab != TabBattlepass {
-		t.Errorf("expected activeTab TabBattlepass, got %v", m.activeTab)
+	if m.activeTab != TabMatches {
+		t.Errorf("expected activeTab TabMatches, got %v", m.activeTab)
 	}
 
-	// Previous tab -> Shop
+	// Previous tab -> Store
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	m = updated.(MainModel)
-	if m.activeTab != TabShop {
-		t.Errorf("expected activeTab TabShop, got %v", m.activeTab)
+	if m.activeTab != TabStore {
+		t.Errorf("expected activeTab TabStore, got %v", m.activeTab)
 	}
 }
 
@@ -251,5 +251,234 @@ func TestMainModelHeaderWithWalletAndRank(t *testing.T) {
 	}
 	if !strings.Contains(view, "85 RP") {
 		t.Errorf("expected '85 RP' in header, got:\n%s", view)
+	}
+}
+
+func TestMatchesModelListAndDetail(t *testing.T) {
+	puuid := "player-me"
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "match-123",
+			MapID:    "/Game/Maps/Ascent/Ascent",
+			QueueID:  "competitive",
+			IsRanked: true,
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puuid,
+				GameName:    "Player",
+				TagLine:     "1234",
+				TeamID:      "Blue",
+				CharacterID: "add6443a-4814-a636-2241-60a3a2777160",
+				Stats: models.PlayerStats{
+					Kills:        24,
+					Deaths:       12,
+					Assists:      4,
+					Score:        5500,
+					RoundsPlayed: 20,
+				},
+			},
+			{
+				Subject:     "enemy-1",
+				GameName:    "Enemy",
+				TagLine:     "9999",
+				TeamID:      "Red",
+				CharacterID: "a3bfb80f-4041-f0a0-a540-49b4e40b00a5",
+				Stats: models.PlayerStats{
+					Kills:        12,
+					Deaths:       18,
+					Assists:      2,
+					Score:        2800,
+					RoundsPlayed: 20,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13, RoundsPlayed: 20},
+			{TeamID: "Red", Won: false, RoundsWon: 7, RoundsPlayed: 20},
+		},
+		RoundResults: []models.RoundResult{
+			{
+				RoundNum:    1,
+				WinningTeam: "Blue",
+				PlayerStats: []models.RoundPlayerStat{
+					{
+						Subject: puuid,
+						Damage: []models.RoundDamage{
+							{Receiver: "enemy-1", Damage: 150, Headshots: 1},
+						},
+						Kills: []models.RoundKill{
+							{
+								Killer: puuid,
+								Victim: "enemy-1",
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "9c82e19d-4575-0200-1a81-3eacf00cf872",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	items := []MatchItem{
+		{
+			MatchID:     "match-123",
+			MapName:     "Ascent",
+			QueueName:   "Competitive",
+			AgentName:   "Jett",
+			Outcome:     "WIN",
+			Score:       "13-7",
+			Kills:       24,
+			Deaths:      12,
+			Assists:     4,
+			RREarned:    21,
+			HasRR:       true,
+			Details:     details,
+			PlayerPUUID: puuid,
+		},
+	}
+
+	mm := NewMatchesModel(items, puuid, nil, nil)
+	mm.SetSize(100, 30)
+
+	// Test List View
+	listView := mm.View()
+	if !strings.Contains(listView, "MATCH HISTORY") {
+		t.Errorf("expected MATCH HISTORY header, got:\n%s", listView)
+	}
+	if !strings.Contains(listView, "WIN") || !strings.Contains(listView, "Ascent") {
+		t.Errorf("expected WIN and Ascent in list, got:\n%s", listView)
+	}
+
+	// Press Enter to drill down into detail
+	updated, _ := mm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mm = updated
+
+	detailView := mm.View()
+	if !strings.Contains(detailView, "MATCH DETAIL") {
+		t.Errorf("expected MATCH DETAIL header, got:\n%s", detailView)
+	}
+	if !strings.Contains(detailView, "BLUE TEAM") {
+		t.Errorf("expected BLUE TEAM in detail view, got:\n%s", detailView)
+	}
+	if !strings.Contains(detailView, "ROUND TIMELINE") {
+		t.Errorf("expected ROUND TIMELINE in detail view, got:\n%s", detailView)
+	}
+
+	// Press Esc to return to list
+	updated, _ = mm.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mm = updated
+	backView := mm.View()
+	if !strings.Contains(backView, "MATCH HISTORY") {
+		t.Errorf("expected return to MATCH HISTORY list view, got:\n%s", backView)
+	}
+}
+
+func TestStatsModelView(t *testing.T) {
+	puuid := "player-me"
+	details := []*models.MatchDetails{
+		{
+			MatchInfo: models.MatchInfo{MatchID: "m1", MapID: "Ascent"},
+			Players: []models.MatchPlayer{
+				{
+					Subject:     puuid,
+					CharacterID: "add6443a-4814-a636-2241-60a3a2777160", // Jett
+					Stats: models.PlayerStats{
+						Kills:        20,
+						Deaths:       10,
+						Score:        4000,
+						RoundsPlayed: 16,
+					},
+				},
+			},
+			Teams: []models.MatchTeam{
+				{TeamID: "Blue", Won: true, RoundsWon: 13},
+				{TeamID: "Red", Won: false, RoundsWon: 3},
+			},
+			RoundResults: []models.RoundResult{
+				{
+					RoundNum: 1,
+					PlayerStats: []models.RoundPlayerStat{
+						{
+							Subject: puuid,
+							Damage: []models.RoundDamage{
+								{Damage: 160, Headshots: 1, Bodyshots: 1},
+							},
+							Kills: []models.RoundKill{
+								{
+									Killer: puuid,
+									FinishingDamage: models.FinishingDamage{
+										DamageItem: "9c82e19d-4575-0200-1a81-3eacf00cf872", // Vandal
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compUpdates := &models.CompetitiveUpdatesResponse{
+		Matches: []models.CompetitiveUpdateMatch{
+			{MatchID: "m1", RankedRatingEarned: 24},
+		},
+	}
+
+	sm := NewStatsModel(details, puuid, compUpdates, nil, nil, "Ascendant 1")
+	sm.SetSize(100, 35)
+	view := sm.View()
+
+	if !strings.Contains(view, "AGENT PERFORMANCE") {
+		t.Errorf("expected AGENT PERFORMANCE in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "WEAPON STATS") {
+		t.Errorf("expected WEAPON STATS in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "AIM ANALYSIS") {
+		t.Errorf("expected AIM ANALYSIS in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "RANK RATING") {
+		t.Errorf("expected RANK RATING in view, got:\n%s", view)
+	}
+}
+
+func TestMainModel5TabSwitching(t *testing.T) {
+	session := &models.Session{Region: "ap", Shard: "ap"}
+	m := NewMainModel(session)
+
+	// Tab 1: Store
+	if m.activeTab != TabStore {
+		t.Errorf("expected TabStore, got %v", m.activeTab)
+	}
+
+	// Press '2' -> Matches
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m = updated.(MainModel)
+	if m.activeTab != TabMatches {
+		t.Errorf("expected TabMatches, got %v", m.activeTab)
+	}
+
+	// Press '3' -> Stats
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m = updated.(MainModel)
+	if m.activeTab != TabStats {
+		t.Errorf("expected TabStats, got %v", m.activeTab)
+	}
+
+	// Press '4' -> Progress
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	m = updated.(MainModel)
+	if m.activeTab != TabProgress {
+		t.Errorf("expected TabProgress, got %v", m.activeTab)
+	}
+
+	// Press '5' -> Session
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+	m = updated.(MainModel)
+	if m.activeTab != TabSession {
+		t.Errorf("expected TabSession, got %v", m.activeTab)
 	}
 }

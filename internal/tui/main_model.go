@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -20,9 +21,26 @@ import (
 type Tab int
 
 const (
-	TabShop Tab = iota
-	TabNightMarket
-	TabBattlepass
+	TabStore Tab = iota
+	TabMatches
+	TabStats
+	TabProgress
+	TabSession
+)
+
+// Backwards compatibility aliases
+const (
+	TabShop        = TabStore
+	TabNightMarket = TabStore
+	TabBattlepass  = TabProgress
+)
+
+type StoreSubTab int
+
+const (
+	SubTabShop StoreSubTab = iota
+	SubTabWishlist
+	SubTabNightMarket
 )
 
 // ── Messages ────────────────────────────────────────────────────────
@@ -38,6 +56,12 @@ type DataLoadedMsg struct {
 	MMR           *models.MMRResponse
 	RankName      string
 	Missions      []models.Mission
+	MatchItems    []MatchItem
+	MatchDetails  []*models.MatchDetails
+	CompUpdates   *models.CompetitiveUpdatesResponse
+	AgentsMap     map[string]string
+	MapsMap       map[string]string
+	WeaponsMap    map[string]string
 	RanksMap      map[int]string
 	Err           error
 }
@@ -59,8 +83,11 @@ type MainModel struct {
 	activeTab     Tab
 	tabs          []Tab
 	tabNames      map[Tab]string
+	storeSubTab   StoreSubTab
 	shopModel     ShopModel
 	nightModel    NightMarketModel
+	matchesModel  MatchesModel
+	statsModel    StatsModel
 	progressModel ProgressModel
 	bpModel       ProgressModel
 	session       *models.Session
@@ -74,27 +101,36 @@ type MainModel struct {
 	rankName      string
 	missions      []models.Mission
 	ranksMap      map[int]string
+	agentsMap     map[string]string
+	mapsMap       map[string]string
+	weaponsMap    map[string]string
 }
 
 func NewMainModel(session *models.Session) MainModel {
-	tabs := []Tab{TabShop, TabBattlepass}
+	tabs := []Tab{TabStore, TabMatches, TabStats, TabProgress, TabSession}
 	tabNames := map[Tab]string{
-		TabShop:        "  Daily Shop",
-		TabNightMarket: " ✦ Night Market",
-		TabBattlepass:  "  Progress",
+		TabStore:    "[1] Store",
+		TabMatches:  "[2] Matches",
+		TabStats:    "[3] Stats",
+		TabProgress: "[4] Progress",
+		TabSession:  "[5] Session",
 	}
 
 	needsRegion := session.Region == ""
 
 	return MainModel{
-		activeTab:   TabShop,
+		activeTab:   TabStore,
 		tabs:        tabs,
 		tabNames:    tabNames,
+		storeSubTab: SubTabShop,
 		session:     session,
 		needsRegion: needsRegion,
 		regionModel: NewRegionSelectModel(),
 		loading:     !needsRegion,
 		ranksMap:    cache.DefaultRankNames,
+		agentsMap:   cache.DefaultAgentNames,
+		mapsMap:     cache.DefaultMapNames,
+		weaponsMap:  cache.DefaultWeaponNames,
 	}
 }
 
@@ -118,6 +154,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.shopModel.SetSize(msg.Width, contentHeight)
 		m.nightModel.SetSize(msg.Width, contentHeight)
+		m.matchesModel.SetSize(msg.Width, contentHeight)
+		m.statsModel.SetSize(msg.Width, contentHeight)
 		m.progressModel.SetSize(msg.Width, contentHeight)
 		m.bpModel = m.progressModel
 		m.regionModel.width = msg.Width
@@ -146,6 +184,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+		// Top-level Global Keys
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -160,20 +199,38 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.nextTab()
 			return m, nil
 		case "1":
-			m.activeTab = TabShop
+			m.activeTab = TabStore
 			return m, nil
 		case "2":
-			if m.hasNightMarket() {
-				m.activeTab = TabNightMarket
-			} else {
-				m.activeTab = TabBattlepass
-			}
+			m.activeTab = TabMatches
 			return m, nil
 		case "3":
-			if m.hasNightMarket() {
-				m.activeTab = TabBattlepass
-			}
+			m.activeTab = TabStats
 			return m, nil
+		case "4":
+			m.activeTab = TabProgress
+			return m, nil
+		case "5":
+			m.activeTab = TabSession
+			return m, nil
+		}
+
+		// Store sub-tab navigation
+		if m.activeTab == TabStore {
+			switch msg.String() {
+			case "a":
+				m.storeSubTab = SubTabShop
+				return m, nil
+			case "s":
+				// Sub-tab wishlist or navigation handled
+				m.storeSubTab = SubTabWishlist
+				return m, nil
+			case "d":
+				if m.nightModel.HasData() {
+					m.storeSubTab = SubTabNightMarket
+				}
+				return m, nil
+			}
 		}
 
 	case RefreshMsg:
@@ -193,29 +250,36 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rankName = msg.RankName
 		m.missions = msg.Missions
 		m.ranksMap = msg.RanksMap
+		m.agentsMap = msg.AgentsMap
+		m.mapsMap = msg.MapsMap
+		m.weaponsMap = msg.WeaponsMap
 
-		// Update sub-models
+		// Sizing
 		headerHeight := 5
 		contentHeight := m.height - headerHeight
 		if contentHeight < 0 {
 			contentHeight = 0
 		}
 
+		// Update sub-models
 		m.shopModel = NewShopModel(msg.ShopSkins, msg.TimeRemaining)
 		m.shopModel.SetSize(m.width, contentHeight)
 
 		if msg.NightMarket != nil && len(msg.NightMarket) > 0 {
 			m.nightModel = NewNightMarketModel(msg.NightMarket, msg.NMDiscounts)
 			m.nightModel.SetSize(m.width, contentHeight)
-			if !m.hasNightMarket() {
-				m.tabs = []Tab{TabShop, TabNightMarket, TabBattlepass}
-			}
 		} else {
-			m.tabs = []Tab{TabShop, TabBattlepass}
-			if m.activeTab == TabNightMarket {
-				m.activeTab = TabShop
+			m.nightModel = NewNightMarketModel(nil, nil)
+			if m.storeSubTab == SubTabNightMarket {
+				m.storeSubTab = SubTabShop
 			}
 		}
+
+		m.matchesModel = NewMatchesModel(msg.MatchItems, m.session.PUUID, msg.AgentsMap, msg.MapsMap)
+		m.matchesModel.SetSize(m.width, contentHeight)
+
+		m.statsModel = NewStatsModel(msg.MatchDetails, m.session.PUUID, msg.CompUpdates, msg.AgentsMap, msg.WeaponsMap, msg.RankName)
+		m.statsModel.SetSize(m.width, contentHeight)
 
 		m.progressModel = NewProgressModel(msg.Battlepass, msg.Missions)
 		m.progressModel.SetSize(m.width, contentHeight)
@@ -233,14 +297,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Route to active sub-model
+	// Route keys to active sub-model
 	var cmd tea.Cmd
 	switch m.activeTab {
-	case TabShop:
-		m.shopModel, cmd = m.shopModel.Update(msg)
-	case TabNightMarket:
-		m.nightModel, cmd = m.nightModel.Update(msg)
-	case TabBattlepass:
+	case TabStore:
+		if m.storeSubTab == SubTabNightMarket {
+			m.nightModel, cmd = m.nightModel.Update(msg)
+		} else {
+			m.shopModel, cmd = m.shopModel.Update(msg)
+		}
+	case TabMatches:
+		m.matchesModel, cmd = m.matchesModel.Update(msg)
+	case TabStats:
+		m.statsModel, cmd = m.statsModel.Update(msg)
+	case TabProgress:
 		m.progressModel, cmd = m.progressModel.Update(msg)
 		m.bpModel = m.progressModel
 	}
@@ -260,7 +330,7 @@ func (m MainModel) View() string {
 
 	var sb strings.Builder
 
-	// ── Header ──────────────────────────────────────────────────
+	// ── Header Bar ──────────────────────────────────────────────
 	var headerParts []string
 	headerParts = append(headerParts, TitleStyle.Render("⚡ VAL-TRACKER TUI"))
 	regionTag := lipgloss.NewStyle().
@@ -305,7 +375,7 @@ func (m MainModel) View() string {
 	headerLine := lipgloss.JoinHorizontal(lipgloss.Center, headerParts...)
 	sb.WriteString(headerLine + "\n\n")
 
-	// ── Tabs ────────────────────────────────────────────────────
+	// ── Top-level Tabs ──────────────────────────────────────────
 	var tabs []string
 	for _, t := range m.tabs {
 		name := m.tabNames[t]
@@ -322,20 +392,55 @@ func (m MainModel) View() string {
 	}
 	sb.WriteString(strings.Repeat("─", lineLen) + "\n\n")
 
+	// ── Store Sub-navigation (if Store tab is active) ───────────
+	if m.activeTab == TabStore {
+		subTabs := []string{}
+		if m.storeSubTab == SubTabShop {
+			subTabs = append(subTabs, ActiveTabStyle.Render("[a] Shop"))
+		} else {
+			subTabs = append(subTabs, InactiveTabStyle.Render("[a] Shop"))
+		}
+
+		if m.storeSubTab == SubTabWishlist {
+			subTabs = append(subTabs, ActiveTabStyle.Render("[s] Wishlist"))
+		} else {
+			subTabs = append(subTabs, InactiveTabStyle.Render("[s] Wishlist"))
+		}
+
+		if m.nightModel.HasData() {
+			if m.storeSubTab == SubTabNightMarket {
+				subTabs = append(subTabs, ActiveTabStyle.Render("[d] Night Market"))
+			} else {
+				subTabs = append(subTabs, InactiveTabStyle.Render("[d] Night Market"))
+			}
+		}
+		sb.WriteString("  " + lipgloss.JoinHorizontal(lipgloss.Top, subTabs...) + "\n\n")
+	}
+
 	// ── Active Panel ────────────────────────────────────────────
 	switch m.activeTab {
-	case TabShop:
-		sb.WriteString(m.shopModel.View())
-	case TabNightMarket:
-		sb.WriteString(m.nightModel.View())
-	case TabBattlepass:
+	case TabStore:
+		if m.storeSubTab == SubTabNightMarket {
+			sb.WriteString(m.nightModel.View())
+		} else if m.storeSubTab == SubTabWishlist {
+			sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("  Wishlist sub-tab (Store → Wishlist)."))
+		} else {
+			sb.WriteString(m.shopModel.View())
+		}
+	case TabMatches:
+		sb.WriteString(m.matchesModel.View())
+	case TabStats:
+		sb.WriteString(m.statsModel.View())
+	case TabProgress:
 		sb.WriteString(m.progressModel.View())
+	case TabSession:
+		sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("  Session tracker tab."))
 	}
 
 	// ── Status Bar ──────────────────────────────────────────────
 	sb.WriteString("\n\n")
 	sb.WriteString(StatusBarStyle.Render(
-		"  ←/→ switch tabs  •  r refresh  •  q quit",
+		"  1-5 switch tabs  •  ←/→ prev/next  •  r refresh  •  q quit",
 	))
 
 	content := sb.String()
@@ -370,12 +475,7 @@ func formatNumber(n int) string {
 }
 
 func (m MainModel) hasNightMarket() bool {
-	for _, t := range m.tabs {
-		if t == TabNightMarket {
-			return true
-		}
-	}
-	return false
+	return m.nightModel.HasData()
 }
 
 func (m *MainModel) nextTab() {
@@ -400,7 +500,7 @@ func (m MainModel) renderLoading() string {
 	content := lipgloss.NewStyle().
 		Foreground(ColorAccent).
 		Bold(true).
-		Render("⟳  Loading your Valorant store...")
+		Render("⟳  Loading your Valorant tracker data...")
 
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
@@ -421,19 +521,24 @@ func (m MainModel) loadData() tea.Msg {
 	client := api.NewClient(m.session)
 
 	var (
-		sf        *models.StorefrontResponse
-		sfErr     error
-		skins     []models.SkinAsset
-		skinsErr  error
-		wallet    *models.WalletResponse
-		mmr       *models.MMRResponse
-		contracts *models.ContractsResponse
-		content   *models.ContentResponse
-		ranksMap  map[int]string
-		wg        sync.WaitGroup
+		sf          *models.StorefrontResponse
+		sfErr       error
+		skins       []models.SkinAsset
+		skinsErr    error
+		wallet      *models.WalletResponse
+		mmr         *models.MMRResponse
+		contracts   *models.ContractsResponse
+		content     *models.ContentResponse
+		matchHist   *models.MatchHistoryResponse
+		compUpdates *models.CompetitiveUpdatesResponse
+		ranksMap    map[int]string
+		agentsMap   map[string]string
+		mapsMap     map[string]string
+		weaponsMap  map[string]string
+		wg          sync.WaitGroup
 	)
 
-	wg.Add(5)
+	wg.Add(7)
 
 	// 1. Fetch storefront
 	go func() {
@@ -466,8 +571,23 @@ func (m MainModel) loadData() tea.Msg {
 		content, _ = client.FetchContent()
 	}()
 
-	// Load ranks (cached)
+	// 6. Fetch Match History
+	go func() {
+		defer wg.Done()
+		matchHist, _ = client.FetchMatchHistory(0, 20, "")
+	}()
+
+	// 7. Fetch Competitive Updates
+	go func() {
+		defer wg.Done()
+		compUpdates, _ = client.FetchCompetitiveUpdates(0, 20)
+	}()
+
+	// Load static caches
 	ranksMap, _ = cache.LoadOrFetchRanks(m.session.ClientVersion)
+	agentsMap, _ = cache.LoadOrFetchAgents(m.session.ClientVersion)
+	mapsMap, _ = cache.LoadOrFetchMaps(m.session.ClientVersion)
+	weaponsMap, _ = cache.LoadOrFetchWeapons(m.session.ClientVersion)
 
 	wg.Wait()
 
@@ -479,8 +599,6 @@ func (m MainModel) loadData() tea.Msg {
 	}
 
 	lookup := cache.BuildSkinLookup(skins)
-
-	// VP currency UUID
 	const vpUUID = "85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741"
 
 	// Resolve daily shop skins
@@ -545,7 +663,6 @@ func (m MainModel) loadData() tea.Msg {
 				iconURL = *asset.Levels[0].DisplayIcon
 			}
 
-			// Calculate discounted price
 			cost := bo.Offer.Cost[vpUUID]
 			if len(bo.DiscountCosts) > 0 && bo.DiscountCosts[vpUUID] > 0 {
 				cost = bo.DiscountCosts[vpUUID]
@@ -592,6 +709,86 @@ func (m MainModel) loadData() tea.Msg {
 		rankName = cache.GetRankName(tier, ranksMap)
 	}
 
+	// Fetch match details for recent matches (up to 10 in parallel)
+	var matchDetails []*models.MatchDetails
+	var matchItems []MatchItem
+
+	if matchHist != nil && len(matchHist.History) > 0 {
+		limit := min(len(matchHist.History), 10)
+		detailChan := make(chan *models.MatchDetails, limit)
+		var detailWg sync.WaitGroup
+
+		for i := 0; i < limit; i++ {
+			matchSummary := matchHist.History[i]
+			detailWg.Add(1)
+			go func(mID string) {
+				defer detailWg.Done()
+				d, dErr := client.FetchMatchDetails(mID)
+				if dErr == nil && d != nil {
+					detailChan <- d
+				}
+			}(matchSummary.MatchID)
+		}
+
+		detailWg.Wait()
+		close(detailChan)
+
+		detailsMap := make(map[string]*models.MatchDetails)
+		for d := range detailChan {
+			detailsMap[d.MatchInfo.MatchID] = d
+			matchDetails = append(matchDetails, d)
+		}
+
+		// Build RR update map by matchID
+		rrMap := make(map[string]int)
+		if compUpdates != nil {
+			for _, cu := range compUpdates.Matches {
+				rrMap[cu.MatchID] = cu.RankedRatingEarned
+			}
+		}
+
+		// Assemble MatchItems preserving history order
+		for _, ms := range matchHist.History {
+			d, hasDetail := detailsMap[ms.MatchID]
+			item := MatchItem{
+				MatchID:     ms.MatchID,
+				QueueName:   "Unrated",
+				Outcome:     "DRAW",
+				Score:       "0-0",
+				GameTime:    time.UnixMilli(ms.GameStartTime),
+				PlayerPUUID: m.session.PUUID,
+			}
+
+			if rr, ok := rrMap[ms.MatchID]; ok {
+				item.RREarned = rr
+				item.HasRR = true
+			}
+
+			if hasDetail && d != nil {
+				item.Details = d
+				item.MapName = cache.GetMapName(d.MatchInfo.MapID, mapsMap)
+				if d.MatchInfo.IsRanked || strings.EqualFold(d.MatchInfo.QueueID, "competitive") {
+					item.QueueName = "Competitive"
+				} else if d.MatchInfo.QueueID != "" {
+					item.QueueName = strings.Title(d.MatchInfo.QueueID)
+				}
+				item.Outcome = d.GetMatchOutcome(m.session.PUUID)
+				item.Score = d.ScoreString(m.session.PUUID)
+
+				if p := d.GetPlayer(m.session.PUUID); p != nil {
+					item.AgentName = cache.GetAgentName(p.CharacterID, agentsMap)
+					item.Kills = p.Stats.Kills
+					item.Deaths = p.Stats.Deaths
+					item.Assists = p.Stats.Assists
+				}
+			} else {
+				item.MapName = "Valorant Match"
+			}
+
+			matchItems = append(matchItems, item)
+		}
+	}
+
 	return DataLoadedMsg{
 		ShopSkins:     shopSkins,
 		NightMarket:   nightSkins,
@@ -602,6 +799,12 @@ func (m MainModel) loadData() tea.Msg {
 		MMR:           mmr,
 		RankName:      rankName,
 		Missions:      missions,
+		MatchItems:    matchItems,
+		MatchDetails:  matchDetails,
+		CompUpdates:   compUpdates,
+		AgentsMap:     agentsMap,
+		MapsMap:       mapsMap,
+		WeaponsMap:    weaponsMap,
 		RanksMap:      ranksMap,
 	}
 }

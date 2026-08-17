@@ -19,6 +19,11 @@ var (
 	ColorBorder    = lipgloss.Color("#2A2D37")
 	ColorTabActive = lipgloss.Color("#FF4655")
 	ColorTabInact  = lipgloss.Color("#4B5563")
+
+	// Match outcomes
+	ColorWin  = lipgloss.Color("#22C55E") // Green
+	ColorLoss = lipgloss.Color("#EF4444") // Red
+	ColorDraw = lipgloss.Color("#9CA3AF") // Gray
 )
 
 // ContentTierUUID → lipgloss.Color
