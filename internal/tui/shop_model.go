@@ -221,8 +221,11 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 	}
 
 	borderCol := rarityColor
+	if inWishlist {
+		borderCol = ColorUltra // Gold border for wishlist matches
+	}
 	if isSelected {
-		borderCol = ColorUltra
+		borderCol = lipgloss.Color("#FFFFFF") // White border for cursor selection
 	}
 
 	return CardStyle.

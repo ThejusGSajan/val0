@@ -63,6 +63,7 @@ type DataLoadedMsg struct {
 	MapsMap       map[string]string
 	WeaponsMap    map[string]string
 	RanksMap      map[int]string
+	AllSkins      []models.SkinAsset
 	Err           error
 }
 
@@ -190,6 +191,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+		if m.activeTab == TabStore && m.storeSubTab == SubTabWishlist && m.wishlistModel.IsSearchFocused() {
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
+			case "esc":
+				m.wishlistModel.focusSection = 0
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.wishlistModel, cmd = m.wishlistModel.Update(msg)
+				return m, cmd
+			}
+		}
+
 		// Top-level Global Keys
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -281,6 +296,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		m.wishlistModel.SetAllSkins(msg.AllSkins)
 		m.wishlistModel.Refresh()
 		m.wishlistModel.SetSize(m.width, contentHeight)
 
@@ -827,5 +843,6 @@ func (m MainModel) loadData() tea.Msg {
 		MapsMap:       mapsMap,
 		WeaponsMap:    weaponsMap,
 		RanksMap:      ranksMap,
+		AllSkins:      skins,
 	}
 }

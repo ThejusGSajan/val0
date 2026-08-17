@@ -9,14 +9,18 @@ import (
 	"github.com/val-tracker/val-tracker/internal/models"
 )
 
-var wishlistMutex sync.Mutex
+var (
+	wishlistMutex  sync.Mutex
+	wishlistCache  []WishlistEntry
+	wishlistLoaded bool
+)
 
 type WishlistEntry struct {
-	UUID     string `json:"uuid"`
-	Name     string `json:"name"`
-	Rarity   string `json:"rarity"`
-	CostVP   int    `json:"costVP"`
-	IconURL  string `json:"iconURL"`
+	UUID    string `json:"uuid"`
+	Name    string `json:"name"`
+	Rarity  string `json:"rarity"`
+	CostVP  int    `json:"costVP"`
+	IconURL string `json:"iconURL"`
 }
 
 type wishlistFile struct {
@@ -31,11 +35,25 @@ func wishlistPath() (string, error) {
 	return filepath.Join(dir, "wishlist.json"), nil
 }
 
-// LoadWishlist reads the saved wishlist from disk.
-func LoadWishlist() ([]WishlistEntry, error) {
+// EnsureLoaded loads the wishlist into memory once.
+func EnsureLoaded() {
 	wishlistMutex.Lock()
 	defer wishlistMutex.Unlock()
+	if !wishlistLoaded {
+		wishlistCache, _ = loadFromDisk()
+		wishlistLoaded = true
+	}
+}
 
+// InvalidateCache forces a reload on next access.
+func InvalidateCache() {
+	wishlistMutex.Lock()
+	defer wishlistMutex.Unlock()
+	wishlistLoaded = false
+	wishlistCache = nil
+}
+
+func loadFromDisk() ([]WishlistEntry, error) {
 	path, err := wishlistPath()
 	if err != nil {
 		return nil, err
@@ -53,6 +71,16 @@ func LoadWishlist() ([]WishlistEntry, error) {
 	return wf.Skins, nil
 }
 
+// LoadWishlist reads the saved wishlist from disk (or cached memory).
+func LoadWishlist() ([]WishlistEntry, error) {
+	EnsureLoaded()
+	wishlistMutex.Lock()
+	defer wishlistMutex.Unlock()
+	entries := make([]WishlistEntry, len(wishlistCache))
+	copy(entries, wishlistCache)
+	return entries, nil
+}
+
 // SaveWishlist writes the entire wishlist to disk.
 func SaveWishlist(entries []WishlistEntry) error {
 	wishlistMutex.Lock()
@@ -68,7 +96,12 @@ func SaveWishlist(entries []WishlistEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return err
+	}
+	wishlistCache = entries
+	wishlistLoaded = true
+	return nil
 }
 
 // AddToWishlist adds a skin entry to the wishlist if not already present.
@@ -80,7 +113,9 @@ func AddToWishlist(entry WishlistEntry) error {
 		}
 	}
 	entries = append(entries, entry)
-	return SaveWishlist(entries)
+	err := SaveWishlist(entries)
+	InvalidateCache()
+	return err
 }
 
 // RemoveFromWishlist removes a skin by UUID from the wishlist.
@@ -92,13 +127,17 @@ func RemoveFromWishlist(uuid string) error {
 			updated = append(updated, e)
 		}
 	}
-	return SaveWishlist(updated)
+	err := SaveWishlist(updated)
+	InvalidateCache()
+	return err
 }
 
 // IsInWishlist returns true if a skin UUID is saved in the wishlist.
 func IsInWishlist(uuid string) bool {
-	entries, _ := LoadWishlist()
-	for _, e := range entries {
+	EnsureLoaded()
+	wishlistMutex.Lock()
+	defer wishlistMutex.Unlock()
+	for _, e := range wishlistCache {
 		if e.UUID == uuid {
 			return true
 		}

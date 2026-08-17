@@ -8,29 +8,51 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/val-tracker/val-tracker/internal/cache"
+	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/val-tracker/val-tracker/internal/sprite"
 )
 
 type WishlistModel struct {
+	// Wishlist section
 	entries  []cache.WishlistEntry
-	cursor   int
-	width    int
-	height   int
-	flashMsg string
+	wlCursor int
+
+	// Browse section
+	allSkins    []models.SkinAsset // all skins from cache
+	filtered    []models.SkinAsset // filtered by search
+	searchInput string
+	brCursor    int
+
+	// UI state
+	focusSection int // 0 = wishlist section, 1 = browse section
+	width        int
+	height       int
+	flashMsg     string
 }
 
 func NewWishlistModel() WishlistModel {
 	entries, _ := cache.LoadWishlist()
 	return WishlistModel{
-		entries: entries,
+		entries:      entries,
+		focusSection: 0,
 	}
+}
+
+func (m *WishlistModel) SetAllSkins(skins []models.SkinAsset) {
+	m.allSkins = skins
+	m.filterSkins()
 }
 
 func (m *WishlistModel) Refresh() {
 	entries, _ := cache.LoadWishlist()
 	m.entries = entries
-	if m.cursor >= len(m.entries) && len(m.entries) > 0 {
-		m.cursor = len(m.entries) - 1
+	if m.wlCursor >= len(m.entries) && len(m.entries) > 0 {
+		m.wlCursor = len(m.entries) - 1
 	}
+	if m.wlCursor < 0 {
+		m.wlCursor = 0
+	}
+	m.filterSkins()
 }
 
 func (m *WishlistModel) SetSize(w, h int) {
@@ -38,26 +60,125 @@ func (m *WishlistModel) SetSize(w, h int) {
 	m.height = h
 }
 
+func (m WishlistModel) IsSearchFocused() bool {
+	return m.focusSection == 1
+}
+
+func (m *WishlistModel) filterSkins() {
+	if m.searchInput == "" {
+		m.filtered = m.allSkins
+	} else {
+		query := strings.ToLower(m.searchInput)
+		m.filtered = nil
+		for _, s := range m.allSkins {
+			if strings.Contains(strings.ToLower(s.DisplayName), query) {
+				m.filtered = append(m.filtered, s)
+			}
+		}
+	}
+	if m.brCursor >= len(m.filtered) {
+		m.brCursor = max(len(m.filtered)-1, 0)
+	}
+	if m.brCursor < 0 {
+		m.brCursor = 0
+	}
+}
+
 func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "up", "k", "w":
-			if m.cursor > 0 {
-				m.cursor--
-				m.flashMsg = ""
+		case "tab", "shift+tab":
+			m.focusSection = (m.focusSection + 1) % 2
+			m.flashMsg = ""
+			return m, nil
+		}
+
+		if m.focusSection == 0 {
+			// Wishlist section focused
+			switch msg.String() {
+			case "up", "k":
+				if m.wlCursor > 0 {
+					m.wlCursor--
+					m.flashMsg = ""
+				}
+			case "down", "j":
+				if m.wlCursor < len(m.entries)-1 {
+					m.wlCursor++
+					m.flashMsg = ""
+				}
+			case "x", "delete":
+				if len(m.entries) > 0 && m.wlCursor < len(m.entries) {
+					removed := m.entries[m.wlCursor]
+					_ = cache.RemoveFromWishlist(removed.UUID)
+					m.Refresh()
+					m.flashMsg = fmt.Sprintf("Removed %s from wishlist.", removed.Name)
+				}
 			}
-		case "down", "j", "s":
-			if m.cursor < len(m.entries)-1 {
-				m.cursor++
+		} else {
+			// Browse section focused
+			switch msg.Type {
+			case tea.KeyUp:
+				if m.brCursor > 0 {
+					m.brCursor--
+					m.flashMsg = ""
+				}
+			case tea.KeyDown:
+				if m.brCursor < len(m.filtered)-1 {
+					m.brCursor++
+					m.flashMsg = ""
+				}
+			case tea.KeyEnter:
+				if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
+					selected := m.filtered[m.brCursor]
+					tierUUID := ""
+					if selected.ContentTierUUID != nil {
+						tierUUID = *selected.ContentTierUUID
+					}
+					iconURL := ""
+					if selected.DisplayIcon != nil {
+						iconURL = *selected.DisplayIcon
+					} else if len(selected.Levels) > 0 && selected.Levels[0].DisplayIcon != nil {
+						iconURL = *selected.Levels[0].DisplayIcon
+					}
+					costVP := 0
+					switch RarityNameMap[tierUUID] {
+					case "Select":
+						costVP = 875
+					case "Deluxe":
+						costVP = 1275
+					case "Premium":
+						costVP = 1775
+					case "Exclusive":
+						costVP = 2175
+					case "Ultra":
+						costVP = 2475
+					}
+					entry := cache.WishlistEntry{
+						UUID:    selected.UUID,
+						Name:    selected.DisplayName,
+						Rarity:  RarityNameMap[tierUUID],
+						CostVP:  costVP,
+						IconURL: iconURL,
+					}
+					_ = cache.AddToWishlist(entry)
+					m.Refresh()
+					m.flashMsg = fmt.Sprintf("Added %s to wishlist!", selected.DisplayName)
+				}
+			case tea.KeyBackspace:
+				if len(m.searchInput) > 0 {
+					m.searchInput = m.searchInput[:len(m.searchInput)-1]
+					m.filterSkins()
+					m.flashMsg = ""
+				}
+			case tea.KeySpace:
+				m.searchInput += " "
+				m.filterSkins()
 				m.flashMsg = ""
-			}
-		case "x", "delete", "backspace":
-			if len(m.entries) > 0 && m.cursor < len(m.entries) {
-				removed := m.entries[m.cursor]
-				_ = cache.RemoveFromWishlist(removed.UUID)
-				m.Refresh()
-				m.flashMsg = fmt.Sprintf("Removed %s from wishlist.", removed.Name)
+			case tea.KeyRunes:
+				m.searchInput += string(msg.Runes)
+				m.filterSkins()
+				m.flashMsg = ""
 			}
 		}
 	}
@@ -65,14 +186,17 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 }
 
 func (m WishlistModel) View() string {
-	var sb strings.Builder
+	if m.width == 0 {
+		return ""
+	}
 
+	var sb strings.Builder
 	lineWidth := max(m.width-4, 70)
 
 	header := lipgloss.NewStyle().
 		Foreground(ColorUltra).
 		Bold(true).
-		Render(fmt.Sprintf("  ⭐ SKIN WISHLIST                                         %d skins tracked", len(m.entries)))
+		Render(fmt.Sprintf("  ⭐ SKIN WISHLIST                                         %d skins wishlisted", len(m.entries)))
 	sb.WriteString(header + "\n")
 	sb.WriteString("  " + strings.Repeat("─", lineWidth) + "\n")
 
@@ -80,19 +204,34 @@ func (m WishlistModel) View() string {
 		sb.WriteString(lipgloss.NewStyle().Foreground(ColorWin).Bold(true).Render("  ✔ "+m.flashMsg) + "\n\n")
 	}
 
-	if len(m.entries) == 0 {
-		emptyMsg := lipgloss.NewStyle().
-			Foreground(ColorMuted).
-			Render("  Your wishlist is empty.\n\n  Go to the Shop tab and press 'w' on any skin to track it here!")
-		sb.WriteString(emptyMsg + "\n")
+	// 1. Wishlist Section
+	wlHeaderStyle := lipgloss.NewStyle().Bold(true)
+	if m.focusSection == 0 {
+		wlHeaderStyle = wlHeaderStyle.Foreground(ColorAccent)
 	} else {
-		for i, entry := range m.entries {
-			cursor := "  "
-			if i == m.cursor {
-				cursor = "▸ "
+		wlHeaderStyle = wlHeaderStyle.Foreground(ColorFg)
+	}
+	sb.WriteString("  " + wlHeaderStyle.Render("YOUR WISHLISTED SKINS:") + "\n")
+
+	if len(m.entries) == 0 {
+		sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render("    (No skins wishlisted yet. Search and add skins below!)") + "\n")
+	} else {
+		maxDisplay := 4
+		start := 0
+		if m.wlCursor >= maxDisplay {
+			start = m.wlCursor - maxDisplay + 1
+		}
+		end := start + maxDisplay
+		if end > len(m.entries) {
+			end = len(m.entries)
+		}
+		for i := start; i < end; i++ {
+			entry := m.entries[i]
+			cursor := "    "
+			if m.focusSection == 0 && i == m.wlCursor {
+				cursor = "  ▸ "
 			}
 
-			// Rarity tag color
 			rarityColor := ColorMuted
 			for uuid, name := range RarityNameMap {
 				if name == entry.Rarity {
@@ -104,32 +243,160 @@ func (m WishlistModel) View() string {
 			nameStr := lipgloss.NewStyle().
 				Foreground(ColorFg).
 				Bold(true).
-				Render(fmt.Sprintf("%2d. %-26s", i+1, truncate(entry.Name, 26)))
+				Render(fmt.Sprintf("%2d. %-24s", i+1, truncate(entry.Name, 24)))
 
 			rarityStr := lipgloss.NewStyle().
 				Foreground(rarityColor).
-				Render(fmt.Sprintf("● %-12s", entry.Rarity))
+				Render(fmt.Sprintf("● %-10s", entry.Rarity))
 
-			priceStr := lipgloss.NewStyle().
-				Foreground(ColorUltra).
-				Bold(true).
-				Render(fmt.Sprintf("VP %d", entry.CostVP))
-
-			row := fmt.Sprintf("%s%s  %s  %s", cursor, nameStr, rarityStr, priceStr)
-
-			if i == m.cursor {
-				row = lipgloss.NewStyle().
-					Background(lipgloss.Color("#1F2430")).
-					Render(row)
+			priceStr := ""
+			if entry.CostVP > 0 {
+				priceStr = lipgloss.NewStyle().
+					Foreground(ColorUltra).
+					Bold(true).
+					Render(fmt.Sprintf("VP %s", formatNumber(entry.CostVP)))
 			}
 
+			row := fmt.Sprintf("%s%s  %s  %s", cursor, nameStr, rarityStr, priceStr)
+			if m.focusSection == 0 && i == m.wlCursor {
+				row = lipgloss.NewStyle().Background(lipgloss.Color("#1F2430")).Render(row)
+			}
 			sb.WriteString(row + "\n")
 		}
 	}
 
-	sb.WriteString("\n" + lipgloss.NewStyle().
+	sb.WriteString("  " + strings.Repeat("─", lineWidth) + "\n\n")
+
+	// 2. Browse Section
+	brHeaderStyle := lipgloss.NewStyle().Bold(true)
+	if m.focusSection == 1 {
+		brHeaderStyle = brHeaderStyle.Foreground(ColorAccent)
+	} else {
+		brHeaderStyle = brHeaderStyle.Foreground(ColorFg)
+	}
+	sb.WriteString("  " + brHeaderStyle.Render("BROWSE & ADD SKINS:") + "\n")
+
+	cursorChar := "_"
+	if m.focusSection != 1 {
+		cursorChar = ""
+	}
+	searchLine := fmt.Sprintf("  Search: %s%s", m.searchInput, cursorChar)
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render(searchLine) + "\n")
+
+	// Pane sizing
+	previewWidth := m.width / 3
+	if previewWidth < 20 {
+		previewWidth = 20
+	}
+	if previewWidth > 40 {
+		previewWidth = 40
+	}
+	listWidth := max(m.width-previewWidth-8, 35)
+
+	// Build Browse List (Left Pane)
+	var listRows []string
+	listRows = append(listRows, "  "+strings.Repeat("─", min(listWidth, lineWidth)))
+
+	if len(m.filtered) == 0 {
+		if len(m.allSkins) == 0 {
+			listRows = append(listRows, lipgloss.NewStyle().Foreground(ColorMuted).Render("    Loading skins..."))
+		} else {
+			listRows = append(listRows, lipgloss.NewStyle().Foreground(ColorMuted).Render("    No skins match your search."))
+		}
+	} else {
+		maxBrDisplay := 6
+		start := 0
+		if m.brCursor >= maxBrDisplay {
+			start = m.brCursor - maxBrDisplay + 1
+		}
+		end := start + maxBrDisplay
+		if end > len(m.filtered) {
+			end = len(m.filtered)
+		}
+		for i := start; i < end; i++ {
+			s := m.filtered[i]
+			cursor := "    "
+			if m.focusSection == 1 && i == m.brCursor {
+				cursor = "  ▸ "
+			}
+
+			tierUUID := ""
+			if s.ContentTierUUID != nil {
+				tierUUID = *s.ContentTierUUID
+			}
+			rarity := RarityNameMap[tierUUID]
+			rarityColor := ColorMuted
+			if c, ok := RarityColorMap[tierUUID]; ok {
+				rarityColor = c
+			}
+
+			costVP := 0
+			switch rarity {
+			case "Select":
+				costVP = 875
+			case "Deluxe":
+				costVP = 1275
+			case "Premium":
+				costVP = 1775
+			case "Exclusive":
+				costVP = 2175
+			case "Ultra":
+				costVP = 2475
+			}
+
+			nameStr := lipgloss.NewStyle().
+				Foreground(ColorFg).
+				Bold(true).
+				Render(fmt.Sprintf("%-22s", truncate(s.DisplayName, 22)))
+
+			rarityStr := lipgloss.NewStyle().
+				Foreground(rarityColor).
+				Render(fmt.Sprintf("● %-9s", rarity))
+
+			priceStr := ""
+			if costVP > 0 {
+				priceStr = lipgloss.NewStyle().
+					Foreground(ColorUltra).
+					Bold(true).
+					Render(fmt.Sprintf("VP %s", formatNumber(costVP)))
+			}
+
+			row := fmt.Sprintf("%s%-24s %-12s %s", cursor, nameStr, rarityStr, priceStr)
+			if m.focusSection == 1 && i == m.brCursor {
+				row = lipgloss.NewStyle().Background(lipgloss.Color("#1F2430")).Render(row)
+			}
+			listRows = append(listRows, row)
+		}
+	}
+
+	leftPane := strings.Join(listRows, "\n")
+
+	// Build Sprite Preview (Right Pane)
+	previewSpr := ""
+	if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
+		selected := m.filtered[m.brCursor]
+		iconURL := ""
+		if selected.DisplayIcon != nil {
+			iconURL = *selected.DisplayIcon
+		} else if len(selected.Levels) > 0 && selected.Levels[0].DisplayIcon != nil {
+			iconURL = *selected.Levels[0].DisplayIcon
+		}
+		if iconURL != "" && previewWidth >= 20 {
+			previewSpr = sprite.Render(iconURL, previewWidth)
+		}
+	}
+	previewSpr = padSpriteToHeight(previewSpr, 6, previewWidth)
+	previewBox := CardStyle.
+		BorderForeground(ColorBorder).
+		Width(previewWidth + 2).
+		Render(previewSpr)
+
+	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "    ", previewBox)
+	sb.WriteString(splitView + "\n\n")
+
+	sb.WriteString(lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Press 'x' to remove selected  •  Add skins from Shop tab with 'w'"))
+		Render("  Tab switch section  •  ↑/↓ navigate  •  Type to search  •  Enter add to wishlist  •  x remove"))
 
 	return sb.String()
 }

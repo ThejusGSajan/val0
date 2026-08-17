@@ -493,6 +493,12 @@ func TestWishlistModel(t *testing.T) {
 		{UUID: "skin-wl-1", Name: "Reaver Vandal", Rarity: "Premium", CostVP: 1775},
 		{UUID: "skin-wl-2", Name: "Prime Phantom", Rarity: "Premium", CostVP: 1775},
 	}
+	tier := "60bca009-4182-7998-dee7-b8a2558dc369"
+	wm.SetAllSkins([]models.SkinAsset{
+		{UUID: "skin-wl-1", DisplayName: "Reaver Vandal", ContentTierUUID: &tier},
+		{UUID: "skin-wl-2", DisplayName: "Prime Phantom", ContentTierUUID: &tier},
+		{UUID: "skin-wl-3", DisplayName: "Prime Vandal", ContentTierUUID: &tier},
+	})
 	wm.SetSize(80, 24)
 
 	view := wm.View()
@@ -502,12 +508,41 @@ func TestWishlistModel(t *testing.T) {
 	if !strings.Contains(view, "Reaver Vandal") || !strings.Contains(view, "Prime Phantom") {
 		t.Errorf("expected wishlist entries in view, got:\n%s", view)
 	}
+	if !strings.Contains(view, "BROWSE & ADD SKINS") {
+		t.Errorf("expected BROWSE & ADD SKINS section, got:\n%s", view)
+	}
 
-	// Move cursor down
+	// Move cursor down in wishlist section
 	updated, _ := wm.Update(tea.KeyMsg{Type: tea.KeyDown})
 	wm = updated
-	if wm.cursor != 1 {
-		t.Errorf("expected cursor 1 after down key, got %d", wm.cursor)
+	if wm.wlCursor != 1 {
+		t.Errorf("expected wlCursor 1 after down key, got %d", wm.wlCursor)
+	}
+
+	// Switch to browse section via Tab
+	updated, _ = wm.Update(tea.KeyMsg{Type: tea.KeyTab})
+	wm = updated
+	if wm.focusSection != 1 {
+		t.Errorf("expected focusSection 1 after Tab, got %d", wm.focusSection)
+	}
+
+	// Type search query "vandal"
+	for _, r := range "vandal" {
+		updated, _ = wm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		wm = updated
+	}
+	if wm.searchInput != "vandal" {
+		t.Errorf("expected searchInput 'vandal', got '%s'", wm.searchInput)
+	}
+	if len(wm.filtered) != 2 {
+		t.Errorf("expected 2 filtered skins for 'vandal', got %d", len(wm.filtered))
+	}
+
+	// Backspace in search
+	updated, _ = wm.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	wm = updated
+	if wm.searchInput != "vanda" {
+		t.Errorf("expected searchInput 'vanda' after backspace, got '%s'", wm.searchInput)
 	}
 }
 
