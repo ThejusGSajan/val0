@@ -482,7 +482,12 @@ func (m MainModel) View() string {
 
 	content := sb.String()
 	if m.width > 0 && m.height > 0 {
-		return AppStyle.Width(m.width).Height(m.height).Render(content)
+		rendered := AppStyle.Render(content)
+		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
+			rendered,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(ColorBg),
+		)
 	}
 	return AppStyle.Render(content)
 }
