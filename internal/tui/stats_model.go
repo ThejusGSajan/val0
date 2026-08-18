@@ -175,9 +175,7 @@ func (m StatsModel) Update(msg tea.Msg) (StatsModel, tea.Cmd) {
 				m.scrollOffset--
 			}
 		case "down", "j", "s":
-			if m.scrollOffset < 20 {
-				m.scrollOffset++
-			}
+			m.scrollOffset++
 		}
 	}
 	return m, nil
@@ -330,11 +328,21 @@ func (m StatsModel) View() string {
 		Render("  ↑/↓ scroll stats view"))
 
 	allLines := strings.Split(strings.Join(sections, "\n"), "\n")
-	if m.scrollOffset > 0 && m.scrollOffset < len(allLines) {
-		allLines = allLines[m.scrollOffset:]
+
+	contentHeight := m.height
+	if contentHeight <= 0 {
+		contentHeight = 25
+	}
+	maxScroll := max(0, len(allLines)-contentHeight)
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+	if m.scrollOffset > maxScroll {
+		m.scrollOffset = maxScroll
 	}
 
-	return strings.Join(allLines, "\n")
+	visibleLines := allLines[m.scrollOffset:min(m.scrollOffset+contentHeight, len(allLines))]
+	return strings.Join(visibleLines, "\n")
 }
 
 // ── Sparkline Renderers ─────────────────────────────────────────────
