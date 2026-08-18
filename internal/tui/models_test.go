@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/val-tracker/val-tracker/internal/auth"
 	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
 )
@@ -121,12 +124,18 @@ func TestBattlepassModelView(t *testing.T) {
 
 func TestErrorModelView(t *testing.T) {
 	errModel := NewErrorModel("Please start the Riot Client first.")
-	errModel.width = 80
-	errModel.height = 24
+	errModel.SetSize(80, 24)
 	view := errModel.View()
 
 	if !strings.Contains(view, "Please start the Riot Client first.") {
 		t.Errorf("expected error message in view, got:\n%s", view)
+	}
+
+	// 0-dimension check
+	errModel0 := NewErrorModel("Zero dimensions test")
+	v0 := errModel0.View()
+	if !strings.Contains(v0, "Zero dimensions test") {
+		t.Errorf("expected error message in 0-dim view, got:\n%s", v0)
 	}
 }
 
@@ -678,5 +687,266 @@ func TestMatchesModelPlayerNames(t *testing.T) {
 	}
 	if strings.Contains(view, "other-puuid-2") {
 		t.Errorf("UUID should never be displayed in view, got:\n%s", view)
+	}
+}
+
+func TestRootModel_AuthFlow(t *testing.T) {
+	root := NewRootModel()
+	if root.state != StateAuthenticating {
+		t.Fatalf("expected initial state StateAuthenticating, got %v", root.state)
+	}
+
+	cmd := root.Init()
+	if cmd == nil {
+		t.Fatal("expected Init() to return authenticateCmd")
+	}
+
+	// Test 0-dim View in StateAuthenticating
+	v0 := root.View()
+	if !strings.Contains(v0, "Connecting to Riot Client") {
+		t.Errorf("expected connecting message in View, got:\n%s", v0)
+	}
+
+	// Test window resize during authenticating
+	updated, _ := root.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	root = updated.(RootModel)
+	if root.width != 100 || root.height != 30 {
+		t.Errorf("expected root dimensions 100x30, got %dx%d", root.width, root.height)
+	}
+	vPlaced := root.View()
+	if !strings.Contains(vPlaced, "Connecting to Riot Client") {
+		t.Errorf("expected connecting message in Placed View, got:\n%s", vPlaced)
+	}
+
+	// Test AuthFailedMsg
+	testErr := errors.New("connection refused")
+	updated, _ = root.Update(AuthFailedMsg{Err: testErr})
+	root = updated.(RootModel)
+	if root.state != StateAuthError {
+		t.Fatalf("expected state StateAuthError, got %v", root.state)
+	}
+	errView := root.View()
+	if !strings.Contains(errView, "connection refused") {
+		t.Errorf("expected error message in View, got:\n%s", errView)
+	}
+
+	// Test Lockfile not found special message
+	updated, _ = root.Update(AuthFailedMsg{Err: auth.ErrLockfileNotFound})
+	root = updated.(RootModel)
+	if !strings.Contains(root.View(), "Please start the Riot Client first") {
+		t.Errorf("expected Riot Client lockfile message, got:\n%s", root.View())
+	}
+
+	// Test AuthSuccessMsg
+	session := &models.Session{
+		PUUID:         "test-puuid",
+		Region:        "na",
+		Shard:         "na",
+		ClientVersion: "release-13.02",
+	}
+	updated, initCmd := root.Update(AuthSuccessMsg{Session: session})
+	root = updated.(RootModel)
+	if root.state != StateMain {
+		t.Fatalf("expected state StateMain, got %v", root.state)
+	}
+	if initCmd == nil {
+		t.Error("expected initCmd from MainModel upon AuthSuccessMsg")
+	}
+	mainView := root.View()
+	if mainView == "" {
+		t.Error("expected non-empty MainModel view")
+	}
+}
+
+func TestRootModel_Retry(t *testing.T) {
+	root := NewRootModel()
+	updated, _ := root.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	root = updated.(RootModel)
+
+	// Move to error state
+	updated, _ = root.Update(AuthFailedMsg{Err: errors.New("auth failure")})
+	root = updated.(RootModel)
+	if root.state != StateAuthError {
+		t.Fatalf("expected StateAuthError, got %v", root.state)
+	}
+
+	// Press 'r' to retry
+	updated, cmd := root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	root = updated.(RootModel)
+	if root.state != StateAuthenticating {
+		t.Fatalf("expected StateAuthenticating after pressing 'r', got %v", root.state)
+	}
+	if cmd == nil {
+		t.Fatal("expected retry authenticateCmd on pressing 'r'")
+	}
+
+	// Move to error state again
+	updated, _ = root.Update(AuthFailedMsg{Err: errors.New("auth failure 2")})
+	root = updated.(RootModel)
+
+	// Send RetryAuthMsg
+	updated, cmd = root.Update(RetryAuthMsg{})
+	root = updated.(RootModel)
+	if root.state != StateAuthenticating {
+		t.Fatalf("expected StateAuthenticating on RetryAuthMsg, got %v", root.state)
+	}
+	if cmd == nil {
+		t.Fatal("expected authenticateCmd on RetryAuthMsg")
+	}
+
+	// Test 'q' quits in error state
+	updated, cmd = root.Update(AuthFailedMsg{Err: errors.New("quit test")})
+	root = updated.(RootModel)
+	_, cmd = root.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd == nil {
+		t.Fatal("expected quit cmd on 'q'")
+	}
+}
+
+func TestErrorModel_DynamicSizing(t *testing.T) {
+	errModel := NewErrorModel("Test Error Message")
+
+	// 0-dimension safety check
+	v0 := errModel.View()
+	if !strings.Contains(v0, "Test Error Message") || !strings.Contains(v0, "Press 'r' to retry") {
+		t.Errorf("expected compact error message on 0 dimensions, got:\n%s", v0)
+	}
+
+	// Narrow terminal (< 40)
+	errModel.SetSize(35, 15)
+	vNarrow := errModel.View()
+	if !strings.Contains(vNarrow, "Test Error Message") {
+		t.Errorf("expected error message on narrow view, got:\n%s", vNarrow)
+	}
+
+	// Standard terminal (80x24)
+	errModel.SetSize(80, 24)
+	vStandard := errModel.View()
+	if !strings.Contains(vStandard, "Test Error Message") {
+		t.Errorf("expected error message on standard view, got:\n%s", vStandard)
+	}
+
+	// Key handling: 'r' returns retry message
+	_, cmd := errModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	if cmd == nil {
+		t.Fatal("expected cmd on 'r'")
+	}
+	msg := cmd()
+	if _, ok := msg.(RetryAuthMsg); !ok {
+		t.Errorf("expected RetryAuthMsg on 'r', got %+v", msg)
+	}
+
+	// Key handling: 'q' returns quit
+	_, cmd = errModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd == nil {
+		t.Fatal("expected quit cmd on 'q'")
+	}
+}
+
+func TestShopModel_WishlistMatching(t *testing.T) {
+	// Add test skin to wishlist
+	targetUUID := "prime-vandal-uuid-123"
+	cache.AddToWishlist(cache.WishlistEntry{
+		UUID:   targetUUID,
+		Name:   "Prime Vandal",
+		Rarity: "Premium",
+		CostVP: 1775,
+	})
+	defer cache.RemoveFromWishlist(targetUUID)
+
+	skins := []models.ResolvedSkin{
+		{
+			UUID:        targetUUID,
+			DisplayName: "Prime Vandal",
+			Rarity:      "Premium",
+			CostVP:      1775,
+		},
+		{
+			UUID:        "other-skin-uuid",
+			DisplayName: "Reaver Phantom",
+			Rarity:      "Premium",
+			CostVP:      1775,
+		},
+	}
+
+	model := NewShopModel(skins, 3600)
+	model.SetSize(100, 30)
+	view := model.View()
+
+	if !strings.Contains(view, "WISHLIST MATCH!") {
+		t.Errorf("expected wishlist match banner in shop view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "WISHLIST ITEM") {
+		t.Errorf("expected wishlist item tag on skin card, got:\n%s", view)
+	}
+}
+
+func TestStatsModel_ViewportBounds(t *testing.T) {
+	// Create mock match details with multiple rounds and kills to generate long sections
+	playerPUUID := "player-1"
+	var matches []*models.MatchDetails
+	for i := 0; i < 10; i++ {
+		md := &models.MatchDetails{
+			MatchInfo: models.MatchInfo{MatchID: fmt.Sprintf("match-%d", i), MapID: "Ascent"},
+			Players: []models.MatchPlayer{
+				{
+					Subject:     playerPUUID,
+					CharacterID: "agent-jett",
+					TeamID:      "Blue",
+					Stats:       models.PlayerStats{Kills: 15, Deaths: 10, Assists: 5, Score: 3500, RoundsPlayed: 20},
+				},
+			},
+			RoundResults: []models.RoundResult{
+				{
+					PlayerStats: []models.RoundPlayerStat{
+						{
+							Subject: playerPUUID,
+							Damage: []models.RoundDamage{
+								{Headshots: 2, Bodyshots: 3, Legshots: 0, Damage: 180},
+							},
+							Kills: []models.RoundKill{
+								{Killer: playerPUUID, FinishingDamage: models.FinishingDamage{DamageItem: "vandal"}},
+							},
+						},
+					},
+				},
+			},
+		}
+		matches = append(matches, md)
+	}
+
+	compUpdates := &models.CompetitiveUpdatesResponse{
+		Matches: []models.CompetitiveUpdateMatch{
+			{RankedRatingEarned: 20},
+			{RankedRatingEarned: -15},
+		},
+	}
+
+	sm := NewStatsModel(matches, playerPUUID, compUpdates, nil, nil, "Gold 2")
+	targetHeight := 10
+	sm.SetSize(80, targetHeight)
+
+	view := sm.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) > targetHeight {
+		t.Errorf("expected rendered line count <= %d, got %d", targetHeight, len(lines))
+	}
+
+	// Test scroll down
+	updated, _ := sm.Update(tea.KeyMsg{Type: tea.KeyDown})
+	sm = updated
+	viewDown := sm.View()
+	linesDown := strings.Split(viewDown, "\n")
+	if len(linesDown) > targetHeight {
+		t.Errorf("expected rendered line count <= %d after scroll down, got %d", targetHeight, len(linesDown))
+	}
+
+	// Test scroll up
+	updated, _ = sm.Update(tea.KeyMsg{Type: tea.KeyUp})
+	sm = updated
+	viewUp := sm.View()
+	linesUp := strings.Split(viewUp, "\n")
+	if len(linesUp) > targetHeight {
+		t.Errorf("expected rendered line count <= %d after scroll up, got %d", targetHeight, len(linesUp))
 	}
 }
