@@ -79,7 +79,7 @@ var (
 	CardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorBorder).
-			Padding(1).
+			Padding(0, 1).
 			MarginRight(1)
 
 	// VP price badge
