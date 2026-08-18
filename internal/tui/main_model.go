@@ -486,7 +486,7 @@ func (m MainModel) View() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
 			rendered,
 			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(ColorBg),
+			lipgloss.WithWhitespaceBackground(ColorBg),
 		)
 	}
 	return AppStyle.Render(content)
@@ -551,7 +551,14 @@ func (m MainModel) renderLoading() string {
 }
 
 func (m MainModel) renderError() string {
-	content := ErrorStyle.Render(fmt.Sprintf("✕  %s\n\nPress r to retry, q to quit.", m.err.Error()))
+	boxWidth := m.width - 8
+	if boxWidth > 64 {
+		boxWidth = 64
+	}
+	if boxWidth < 28 {
+		boxWidth = 28
+	}
+	content := ErrorStyle.Copy().Width(boxWidth).Render(fmt.Sprintf("✕  %s\n\nPress r to retry, q to quit.", m.err.Error()))
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
@@ -669,7 +676,7 @@ func (m MainModel) loadData() tea.Msg {
 		}
 
 		shopSkins = append(shopSkins, models.ResolvedSkin{
-			UUID:        skinID,
+			UUID:        asset.UUID,
 			DisplayName: asset.DisplayName,
 			Rarity:      RarityNameMap[tierUUID],
 			CostVP:      offer.Cost[vpUUID],
@@ -715,7 +722,7 @@ func (m MainModel) loadData() tea.Msg {
 			}
 
 			nightSkins = append(nightSkins, models.ResolvedSkin{
-				UUID:        skinID,
+				UUID:        asset.UUID,
 				DisplayName: asset.DisplayName,
 				Rarity:      RarityNameMap[tierUUID],
 				CostVP:      cost,
