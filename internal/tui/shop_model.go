@@ -59,7 +59,7 @@ func (m ShopModel) View() string {
 			Background(lipgloss.Color("#2A2410")).
 			Padding(0, 2).
 			Render(fmt.Sprintf("⭐ WISHLIST MATCH! %s is in your shop today!", strings.Join(wishlistMatches, ", ")))
-		sb.WriteString("  " + banner + "\n\n")
+		sb.WriteString("  " + banner + "\n")
 	}
 
 	// Timer
@@ -69,7 +69,7 @@ func (m ShopModel) View() string {
 		Foreground(ColorAccent).
 		Bold(true).
 		Render(fmt.Sprintf("  ⏱  Resets in %dh %dm", hours, minutes))
-	sb.WriteString(timer + "\n\n")
+	sb.WriteString(timer + "\n")
 
 	// Dynamic sizing calculation
 	cardWidth := 44
@@ -103,7 +103,7 @@ func (m ShopModel) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	sb.WriteString(grid + "\n\n")
+	sb.WriteString(grid + "\n")
 
 	sb.WriteString(lipgloss.NewStyle().
 		Foreground(ColorMuted).
@@ -148,7 +148,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		spr = skin.Sprite
 	}
 
-	const spriteTargetRows = 6 // fixed height for all sprite containers
+	const spriteTargetRows = 4 // fixed height for all sprite containers
 	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth)
 
 	if spr != "" {

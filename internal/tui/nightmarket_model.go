@@ -79,7 +79,7 @@ func (m NightMarketModel) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	return header + "\n\n" + grid
+	return header + "\n" + grid
 }
 
 func (m NightMarketModel) HasData() bool {
