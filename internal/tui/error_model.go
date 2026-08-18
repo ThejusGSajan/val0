@@ -16,6 +16,11 @@ func NewErrorModel(msg string) ErrorModel {
 	return ErrorModel{message: msg}
 }
 
+func (m *ErrorModel) SetSize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 func (m ErrorModel) Init() tea.Cmd { return nil }
 
 func (m ErrorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
