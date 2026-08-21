@@ -325,7 +325,7 @@ func (m StatsModel) View() string {
 	sections = append(sections, "")
 	sections = append(sections, lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  ↑/↓ scroll stats view"))
+		Render("  [↑]/[↓] scroll stats view"))
 
 	allLines := strings.Split(strings.Join(sections, "\n"), "\n")
 

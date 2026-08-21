@@ -33,6 +33,11 @@ func NewRegionSelectModel() RegionSelectModel {
 	return RegionSelectModel{}
 }
 
+func (m *RegionSelectModel) SetSize(w, h int) {
+	m.width = w
+	m.height = h
+}
+
 func (m RegionSelectModel) Init() tea.Cmd { return nil }
 
 func (m RegionSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -87,7 +92,7 @@ func (m RegionSelectModel) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ColorBorder).
 		Padding(1, 3).
-		Render(title + "\n" + subtitle + "\n\n" + items.String() + "\n↑/↓ to move, Enter to select")
+		Render(title + "\n" + subtitle + "\n\n" + items.String() + "\n[↑]/[↓] to move, [Enter] to select")
 
 	return lipgloss.Place(m.width, m.height,
 		lipgloss.Center, lipgloss.Center, box)

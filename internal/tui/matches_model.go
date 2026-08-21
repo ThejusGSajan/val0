@@ -194,7 +194,7 @@ func (m MatchesModel) renderListView() string {
 
 	sb.WriteString("\n" + lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  ↑/↓ select  •  Enter view match detail"))
+		Render("  [↑]/[↓] select  •  [Enter] view match detail"))
 
 	return sb.String()
 }
@@ -207,7 +207,7 @@ func (m MatchesModel) renderDetailView() string {
 	}
 	item := m.items[m.cursor]
 	if item.Details == nil {
-		return fmt.Sprintf("  Loading match detail for %s...\n\n  Press Esc to go back.", item.MatchID)
+		return fmt.Sprintf("  Loading match detail for %s...\n\n  Press [Esc] to go back.", item.MatchID)
 	}
 
 	d := item.Details
@@ -255,7 +255,7 @@ func (m MatchesModel) renderDetailView() string {
 
 	sb.WriteString("\n\n" + lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Press Esc to return to match list"))
+		Render("  Press [Esc] to return to match list"))
 
 	return sb.String()
 }

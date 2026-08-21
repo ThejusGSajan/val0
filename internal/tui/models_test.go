@@ -849,7 +849,7 @@ func TestErrorModel_DynamicSizing(t *testing.T) {
 
 	// 0-dimension safety check
 	v0 := errModel.View()
-	if !strings.Contains(v0, "Test Error Message") || !strings.Contains(v0, "Press 'r' to retry") {
+	if !strings.Contains(v0, "Test Error Message") || !strings.Contains(v0, "Press [r] to retry") {
 		t.Errorf("expected compact error message on 0 dimensions, got:\n%s", v0)
 	}
 
@@ -1116,5 +1116,75 @@ func TestStoreSubTabContextualLegends(t *testing.T) {
 		t.Errorf("expected '[s] enter shop tab' and '[w] enter wishlist tab' in Night Market view, got:\n%s", nmView)
 	}
 }
+
+func TestGlobalKeyLegendBracketStandardization(t *testing.T) {
+	// 1. MainModel status bar
+	session := &models.Session{Region: "na", Shard: "na"}
+	mainModel := NewMainModel(session)
+	mainModel.loading = false
+	mainView := mainModel.View()
+	expectedMainLegend := "[1-5] switch tabs  •  [←]/[→] prev/next  •  [r] refresh  •  [q] quit"
+	if !strings.Contains(mainView, expectedMainLegend) {
+		t.Errorf("MainModel status bar missing bracketed legend %q, got:\n%s", expectedMainLegend, mainView)
+	}
+
+	// 2. MainModel error rendering
+	mainModel.err = errors.New("network error")
+	errView := mainModel.View()
+	if !strings.Contains(errView, "[r] to retry") || !strings.Contains(errView, "[q] to quit") {
+		t.Errorf("MainModel renderError missing bracketed keys, got:\n%s", errView)
+	}
+
+	// 3. MatchesModel list & detail views
+	matchesModel := NewMatchesModel([]MatchItem{
+		{MatchID: "m1", MapName: "Haven", QueueName: "Competitive"},
+	}, "p1", nil, nil)
+	matchesModel.SetSize(80, 24)
+	listMatchesView := matchesModel.View()
+	if !strings.Contains(listMatchesView, "[↑]/[↓] select  •  [Enter] view match detail") {
+		t.Errorf("MatchesModel list view missing bracketed legend, got:\n%s", listMatchesView)
+	}
+
+	matchesModel.viewMode = MatchViewDetail
+	detailMatchesView := matchesModel.View()
+	if !strings.Contains(detailMatchesView, "Press [Esc] to return to match list") && !strings.Contains(detailMatchesView, "Press [Esc] to go back") {
+		t.Errorf("MatchesModel detail view missing bracketed legend, got:\n%s", detailMatchesView)
+	}
+
+	// 4. StatsModel scroll view
+	statsModel := NewStatsModel(nil, "p1", nil, nil, nil, "Silver 1")
+	statsModel.SetSize(80, 24)
+	statsView := statsModel.View()
+	if !strings.Contains(statsView, "[↑]/[↓] scroll stats view") {
+		t.Errorf("StatsModel missing bracketed legend, got:\n%s", statsView)
+	}
+
+	// 5. RegionSelectModel
+	regionModel := NewRegionSelectModel()
+	regionModel.SetSize(80, 24)
+	regionView := regionModel.View()
+	if !strings.Contains(regionView, "[↑]/[↓] to move, [Enter] to select") {
+		t.Errorf("RegionSelectModel missing bracketed legend, got:\n%s", regionView)
+	}
+
+	// 6. ErrorModel
+	errM := NewErrorModel("Auth Error")
+	errM.SetSize(80, 24)
+	if !strings.Contains(errM.View(), "Press [r] to retry, [q] to exit.") {
+		t.Errorf("ErrorModel missing bracketed legend, got:\n%s", errM.View())
+	}
+
+	// 7. WishlistModel preserves "Type to search" while bracketizing keys
+	wlModel := NewWishlistModel()
+	wlModel.SetSize(80, 24)
+	wlView := wlModel.View()
+	if !strings.Contains(wlView, "Type to search") {
+		t.Errorf("WishlistModel should preserve 'Type to search', got:\n%s", wlView)
+	}
+	if !strings.Contains(wlView, "[Tab] switch section") || !strings.Contains(wlView, "[↑]/[↓] navigate") || !strings.Contains(wlView, "[Enter] add to wishlist") || !strings.Contains(wlView, "[x] remove") {
+		t.Errorf("WishlistModel missing bracketed key legends, got:\n%s", wlView)
+	}
+}
+
 
 
