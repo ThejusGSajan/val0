@@ -205,19 +205,19 @@ func TestProgressModelWithMissions(t *testing.T) {
 
 	missions := []models.Mission{
 		{
-			ID: "daily-mission-1",
+			ID: "5163c5f2-4c28-9844-3d07-2ebdb22f98e6", // DefaultMissions "Get Headshots"
 			Objectives: map[string]int{
-				"obj-1": 10,
+				"04ff6167-4d76-8051-789a-dc853b05f23d": 3,
 			},
 			Complete: false,
 		},
 		{
-			ID:       "daily-mission-2",
+			ID:       "f3e5cfb8-4682-1402-995b-2bb548483f81", // DefaultMissions "Deal Damage"
 			Complete: true,
 		},
 	}
 
-	pm := NewProgressModel(bpData, missions)
+	pm := NewProgressModel(bpData, missions, cache.DefaultMissions)
 	pm.SetSize(80, 24)
 	view := pm.View()
 
@@ -227,8 +227,49 @@ func TestProgressModelWithMissions(t *testing.T) {
 	if !strings.Contains(view, "ACTIVE MISSIONS") {
 		t.Errorf("expected active missions in view, got:\n%s", view)
 	}
-	if !strings.Contains(view, "Completed") {
-		t.Errorf("expected completed mission in view, got:\n%s", view)
+	if !strings.Contains(view, "Get Headshots — 3 / 5") {
+		t.Errorf("expected 'Get Headshots — 3 / 5' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "Deal Damage — Completed") {
+		t.Errorf("expected 'Deal Damage — Completed' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "+2,000 XP") {
+		t.Errorf("expected '+2,000 XP' in view, got:\n%s", view)
+	}
+}
+
+func TestProgressModel_ResolvedMissions(t *testing.T) {
+	missions := []models.Mission{
+		{
+			ID: "custom-mission-uuid",
+			Objectives: map[string]int{
+				"obj-1": 4,
+			},
+			Complete: false,
+		},
+	}
+
+	customMap := map[string]cache.MissionInfo{
+		"custom-mission-uuid": {
+			UUID:               "custom-mission-uuid",
+			Title:              "Play Swiftplay Games",
+			XPGrant:            3500,
+			ProgressToComplete: 5,
+		},
+	}
+
+	pm := NewProgressModel(nil, missions, customMap)
+	pm.SetSize(80, 24)
+	view := pm.View()
+
+	if !strings.Contains(view, "Play Swiftplay Games — 4 / 5") {
+		t.Errorf("expected custom mission title and progress in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "+3,500 XP") {
+		t.Errorf("expected '+3,500 XP' in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "80%") {
+		t.Errorf("expected 80%% progress in view, got:\n%s", view)
 	}
 }
 

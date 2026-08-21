@@ -56,6 +56,7 @@ type DataLoadedMsg struct {
 	MMR           *models.MMRResponse
 	RankName      string
 	Missions      []models.Mission
+	MissionsMap   map[string]cache.MissionInfo
 	MatchItems    []MatchItem
 	MatchDetails  []*models.MatchDetails
 	CompUpdates   *models.CompetitiveUpdatesResponse
@@ -103,6 +104,7 @@ type MainModel struct {
 	mmr           *models.MMRResponse
 	rankName      string
 	missions      []models.Mission
+	missionsMap   map[string]cache.MissionInfo
 	ranksMap      map[int]string
 	agentsMap     map[string]string
 	mapsMap       map[string]string
@@ -132,6 +134,7 @@ func NewMainModel(session *models.Session) MainModel {
 		needsRegion:   needsRegion,
 		regionModel:   NewRegionSelectModel(),
 		loading:       !needsRegion,
+		missionsMap:   cache.DefaultMissions,
 		ranksMap:      cache.DefaultRankNames,
 		agentsMap:     cache.DefaultAgentNames,
 		mapsMap:       cache.DefaultMapNames,
@@ -270,6 +273,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mmr = msg.MMR
 		m.rankName = msg.RankName
 		m.missions = msg.Missions
+		m.missionsMap = msg.MissionsMap
 		m.ranksMap = msg.RanksMap
 		m.agentsMap = msg.AgentsMap
 		m.mapsMap = msg.MapsMap
@@ -306,7 +310,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statsModel = NewStatsModel(msg.MatchDetails, m.session.PUUID, msg.CompUpdates, msg.AgentsMap, msg.WeaponsMap, msg.RankName)
 		m.statsModel.SetSize(m.width, contentHeight)
 
-		m.progressModel = NewProgressModel(msg.Battlepass, msg.Missions)
+		m.progressModel = NewProgressModel(msg.Battlepass, msg.Missions, msg.MissionsMap)
 		m.progressModel.SetSize(m.width, contentHeight)
 		m.bpModel = m.progressModel
 
@@ -589,6 +593,7 @@ func (m MainModel) loadData() tea.Msg {
 		agentsMap   map[string]string
 		mapsMap     map[string]string
 		weaponsMap  map[string]string
+		missionsMap map[string]cache.MissionInfo
 		wg          sync.WaitGroup
 	)
 
@@ -642,6 +647,7 @@ func (m MainModel) loadData() tea.Msg {
 	agentsMap, _ = cache.LoadOrFetchAgents(m.session.ClientVersion)
 	mapsMap, _ = cache.LoadOrFetchMaps(m.session.ClientVersion)
 	weaponsMap, _ = cache.LoadOrFetchWeapons(m.session.ClientVersion)
+	missionsMap, _ = cache.LoadOrFetchMissions(m.session.ClientVersion)
 
 	wg.Wait()
 
@@ -883,6 +889,7 @@ func (m MainModel) loadData() tea.Msg {
 		MMR:           mmr,
 		RankName:      rankName,
 		Missions:      missions,
+		MissionsMap:   missionsMap,
 		MatchItems:    matchItems,
 		MatchDetails:  matchDetails,
 		CompUpdates:   compUpdates,

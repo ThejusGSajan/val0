@@ -7,25 +7,31 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
 )
 
 type ProgressModel struct {
-	data     *BattlepassData
-	missions []models.Mission
-	width    int
-	height   int
+	data        *BattlepassData
+	missions    []models.Mission
+	missionsMap map[string]cache.MissionInfo
+	width       int
+	height      int
 }
 
-func NewProgressModel(data *BattlepassData, missions []models.Mission) ProgressModel {
-	return ProgressModel{data: data, missions: missions}
+func NewProgressModel(data *BattlepassData, missions []models.Mission, missionsMap map[string]cache.MissionInfo) ProgressModel {
+	return ProgressModel{
+		data:        data,
+		missions:    missions,
+		missionsMap: missionsMap,
+	}
 }
 
 // Alias for backwards compatibility
 type BattlepassModel = ProgressModel
 
 func NewBattlepassModel(data *BattlepassData) BattlepassModel {
-	return NewProgressModel(data, nil)
+	return NewProgressModel(data, nil, nil)
 }
 
 func (m *ProgressModel) SetSize(w, h int) {
@@ -105,31 +111,58 @@ func (m ProgressModel) View() string {
 		}
 
 		for idx, ms := range m.missions {
-			title := fmt.Sprintf("Mission #%d", idx+1)
-			if len(ms.ID) >= 8 {
-				title = fmt.Sprintf("Mission %s", ms.ID[:8])
-			}
-
-			if ms.Complete {
-				completedText := lipgloss.NewStyle().
-					Foreground(ColorDeluxe).
-					Bold(true).
-					Render(fmt.Sprintf("  ✔ %s — Completed", title))
-				sections = append(sections, completedText)
-			} else {
-				// Show objective counts
-				for objID, count := range ms.Objectives {
-					objLabel := fmt.Sprintf("%s (Progress: %d)", title, count)
-					if len(objID) >= 8 {
-						objLabel = fmt.Sprintf("%s [%s] — %d completed", title, objID[:8], count)
-					}
-					// If we have count, render bar; assume standard progress or indeterminate
-					sections = append(sections, renderProgressBar(0.5, barWidth, objLabel))
+			info, found := m.lookupMissionInfo(ms.ID)
+			if found {
+				target := info.ProgressToComplete
+				if target <= 0 {
+					target = 1
 				}
-				if len(ms.Objectives) == 0 {
-					sections = append(sections, lipgloss.NewStyle().
-						Foreground(ColorFg).
-						Render(fmt.Sprintf("  • %s — In Progress", title)))
+
+				currentProgress := 0
+				for _, count := range ms.Objectives {
+					currentProgress += count
+				}
+				if currentProgress > target {
+					currentProgress = target
+				}
+
+				if ms.Complete {
+					label := fmt.Sprintf("  ✔ %s — Completed", info.Title)
+					if info.XPGrant > 0 {
+						label = fmt.Sprintf("  ✔ %s — Completed  (+%s XP)", info.Title, formatNumber(info.XPGrant))
+					}
+					completedText := lipgloss.NewStyle().
+						Foreground(ColorDeluxe).
+						Bold(true).
+						Render(label)
+					sections = append(sections, completedText)
+				} else {
+					pct := float64(currentProgress) / float64(target)
+					label := fmt.Sprintf("%s — %d / %d", info.Title, currentProgress, target)
+					if info.XPGrant > 0 {
+						label = fmt.Sprintf("%s — %d / %d  (+%s XP)", info.Title, currentProgress, target, formatNumber(info.XPGrant))
+					}
+					sections = append(sections, renderProgressBar(pct, barWidth, label))
+				}
+			} else {
+				title := fmt.Sprintf("Mission #%d", idx+1)
+				if len(ms.ID) >= 8 {
+					title = fmt.Sprintf("Mission %s", ms.ID[:8])
+				}
+
+				if ms.Complete {
+					completedText := lipgloss.NewStyle().
+						Foreground(ColorDeluxe).
+						Bold(true).
+						Render(fmt.Sprintf("  ✔ %s — Completed", title))
+					sections = append(sections, completedText)
+				} else {
+					count := 0
+					for _, c := range ms.Objectives {
+						count += c
+					}
+					label := fmt.Sprintf("%s — %d completed", title, count)
+					sections = append(sections, renderProgressBar(0.0, barWidth, label))
 				}
 			}
 			sections = append(sections, "")
@@ -137,6 +170,19 @@ func (m ProgressModel) View() string {
 	}
 
 	return strings.Join(sections, "\n")
+}
+
+func (m ProgressModel) lookupMissionInfo(id string) (cache.MissionInfo, bool) {
+	idLower := strings.ToLower(id)
+	if m.missionsMap != nil {
+		if info, ok := m.missionsMap[idLower]; ok {
+			return info, true
+		}
+	}
+	if info, ok := cache.DefaultMissions[idLower]; ok {
+		return info, true
+	}
+	return cache.MissionInfo{}, false
 }
 
 // renderProgressBar creates a terminal progress bar with label.
