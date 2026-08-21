@@ -950,3 +950,35 @@ func TestStatsModel_ViewportBounds(t *testing.T) {
 		t.Errorf("expected rendered line count <= %d after scroll up, got %d", targetHeight, len(linesUp))
 	}
 }
+
+func TestMainModel_ViewportBudgetingAndTruncation(t *testing.T) {
+	session := &models.Session{
+		PUUID:         "test-puuid",
+		Region:        "na",
+		Shard:         "na",
+		ClientVersion: "release-13.02",
+	}
+
+	m := NewMainModel(session)
+	m.loading = false
+
+	// Window resize to small terminal (80x24)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = updated.(MainModel)
+
+	if m.width != 80 || m.height != 24 {
+		t.Fatalf("expected dimensions 80x24, got %dx%d", m.width, m.height)
+	}
+
+	// Verify stats model size budgeted correctly (24 - 8 = 16)
+	if m.statsModel.height != 16 {
+		t.Errorf("expected statsModel height 16 (24-8), got %d", m.statsModel.height)
+	}
+
+	view := m.View()
+	lines := strings.Split(view, "\n")
+	if len(lines) > 24 {
+		t.Errorf("expected MainModel.View() output <= 24 lines, got %d", len(lines))
+	}
+}
+

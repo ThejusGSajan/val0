@@ -152,8 +152,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		headerHeight := 5
-		contentHeight := msg.Height - headerHeight
+		chromeHeight := 8
+		contentHeight := msg.Height - chromeHeight
 		if contentHeight < 0 {
 			contentHeight = 0
 		}
@@ -276,8 +276,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.weaponsMap = msg.WeaponsMap
 
 		// Sizing
-		headerHeight := 5
-		contentHeight := m.height - headerHeight
+		chromeHeight := 8
+		contentHeight := m.height - chromeHeight
 		if contentHeight < 0 {
 			contentHeight = 0
 		}
@@ -482,6 +482,11 @@ func (m MainModel) View() string {
 
 	content := sb.String()
 	if m.width > 0 && m.height > 0 {
+		lines := strings.Split(content, "\n")
+		if len(lines) > m.height {
+			lines = lines[:m.height]
+			content = strings.Join(lines, "\n")
+		}
 		rendered := AppStyle.Render(content)
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
 			rendered,

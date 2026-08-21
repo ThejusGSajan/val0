@@ -331,7 +331,7 @@ func (m StatsModel) View() string {
 
 	contentHeight := m.height
 	if contentHeight <= 0 {
-		contentHeight = 25
+		contentHeight = 20
 	}
 	maxScroll := max(0, len(allLines)-contentHeight)
 	if m.scrollOffset < 0 {
@@ -341,7 +341,8 @@ func (m StatsModel) View() string {
 		m.scrollOffset = maxScroll
 	}
 
-	visibleLines := allLines[m.scrollOffset:min(m.scrollOffset+contentHeight, len(allLines))]
+	endLine := min(m.scrollOffset+contentHeight, len(allLines))
+	visibleLines := allLines[m.scrollOffset:endLine]
 	return strings.Join(visibleLines, "\n")
 }
 
