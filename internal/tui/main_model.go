@@ -242,14 +242,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Store sub-tab navigation
 		if m.activeTab == TabStore {
 			switch msg.String() {
-			case "a":
+			case "s":
 				m.storeSubTab = SubTabShop
 				return m, nil
-			case "s":
+			case "w":
 				m.storeSubTab = SubTabWishlist
 				m.wishlistModel.Refresh()
 				return m, nil
-			case "d":
+			case "n":
 				if m.nightModel.HasData() {
 					m.storeSubTab = SubTabNightMarket
 				}
@@ -290,7 +290,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.shopModel = NewShopModel(msg.ShopSkins, msg.TimeRemaining)
 		m.shopModel.SetSize(m.width, contentHeight)
 
-		if msg.NightMarket != nil && len(msg.NightMarket) > 0 {
+		hasNM := msg.NightMarket != nil && len(msg.NightMarket) > 0
+		if hasNM {
 			m.nightModel = NewNightMarketModel(msg.NightMarket, msg.NMDiscounts)
 			m.nightModel.SetSize(m.width, contentHeight)
 		} else {
@@ -299,6 +300,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.storeSubTab = SubTabShop
 			}
 		}
+
+		m.shopModel.SetNightMarketActive(hasNM)
+		m.wishlistModel.SetNightMarketActive(hasNM)
 
 		m.wishlistModel.SetAllSkins(msg.AllSkins)
 		m.wishlistModel.Refresh()
@@ -437,22 +441,22 @@ func (m MainModel) View() string {
 	if m.activeTab == TabStore {
 		subTabs := []string{}
 		if m.storeSubTab == SubTabShop {
-			subTabs = append(subTabs, ActiveTabStyle.Render("[a] Shop"))
+			subTabs = append(subTabs, ActiveTabStyle.Render("[s] Shop"))
 		} else {
-			subTabs = append(subTabs, InactiveTabStyle.Render("[a] Shop"))
+			subTabs = append(subTabs, InactiveTabStyle.Render("[s] Shop"))
 		}
 
 		if m.storeSubTab == SubTabWishlist {
-			subTabs = append(subTabs, ActiveTabStyle.Render("[s] Wishlist"))
+			subTabs = append(subTabs, ActiveTabStyle.Render("[w] Wishlist"))
 		} else {
-			subTabs = append(subTabs, InactiveTabStyle.Render("[s] Wishlist"))
+			subTabs = append(subTabs, InactiveTabStyle.Render("[w] Wishlist"))
 		}
 
 		if m.nightModel.HasData() {
 			if m.storeSubTab == SubTabNightMarket {
-				subTabs = append(subTabs, ActiveTabStyle.Render("[d] Night Market"))
+				subTabs = append(subTabs, ActiveTabStyle.Render("[n] Night Market"))
 			} else {
-				subTabs = append(subTabs, InactiveTabStyle.Render("[d] Night Market"))
+				subTabs = append(subTabs, InactiveTabStyle.Render("[n] Night Market"))
 			}
 		}
 		sb.WriteString("  " + lipgloss.JoinHorizontal(lipgloss.Top, subTabs...) + "\n\n")

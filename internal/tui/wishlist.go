@@ -24,10 +24,11 @@ type WishlistModel struct {
 	brCursor    int
 
 	// UI state
-	focusSection int // 0 = wishlist section, 1 = browse section
-	width        int
-	height       int
-	flashMsg     string
+	focusSection   int // 0 = wishlist section, 1 = browse section
+	hasNightMarket bool
+	width          int
+	height         int
+	flashMsg       string
 }
 
 func NewWishlistModel() WishlistModel {
@@ -36,6 +37,10 @@ func NewWishlistModel() WishlistModel {
 		entries:      entries,
 		focusSection: 0,
 	}
+}
+
+func (m *WishlistModel) SetNightMarketActive(active bool) {
+	m.hasNightMarket = active
 }
 
 func (m *WishlistModel) SetAllSkins(skins []models.SkinAsset) {
@@ -394,9 +399,14 @@ func (m WishlistModel) View() string {
 	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "    ", previewBox)
 	sb.WriteString(splitView + "\n\n")
 
-	sb.WriteString(lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		Render("  Tab switch section  •  ↑/↓ navigate  •  Type to search  •  Enter add to wishlist  •  x remove"))
+	var subNav []string
+	subNav = append(subNav, "[s] enter shop tab")
+	if m.hasNightMarket {
+		subNav = append(subNav, "[n] enter nightmarket tab")
+	}
+
+	navLine := "  " + strings.Join(subNav, "  •  ") + "  •  [Tab] switch section  •  [↑]/[↓] navigate  •  Type to search  •  [Enter] add to wishlist  •  [x] remove"
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(navLine))
 
 	return sb.String()
 }

@@ -13,14 +13,19 @@ import (
 )
 
 type ShopModel struct {
-	skins         []models.ResolvedSkin
-	timeRemaining int // seconds
-	width         int
-	height        int
+	skins          []models.ResolvedSkin
+	timeRemaining  int // seconds
+	hasNightMarket bool
+	width          int
+	height         int
 }
 
 func NewShopModel(skins []models.ResolvedSkin, timeRemaining int) ShopModel {
 	return ShopModel{skins: skins, timeRemaining: timeRemaining}
+}
+
+func (m *ShopModel) SetNightMarketActive(active bool) {
+	m.hasNightMarket = active
 }
 
 func (m *ShopModel) SetSize(w, h int) {
@@ -105,9 +110,14 @@ func (m ShopModel) View() string {
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	sb.WriteString(grid + "\n")
 
+	var storeLegends []string
+	storeLegends = append(storeLegends, "[w] enter wishlist tab")
+	if m.hasNightMarket {
+		storeLegends = append(storeLegends, "[n] enter nightmarket tab")
+	}
 	sb.WriteString(lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Press 's' to enter wishlist tab"))
+		Render("  " + strings.Join(storeLegends, "  •  ")))
 
 	return sb.String()
 }

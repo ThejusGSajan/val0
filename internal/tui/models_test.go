@@ -656,8 +656,8 @@ func TestShopModelWishlistRendering(t *testing.T) {
 	if !strings.Contains(view, "WISHLIST MATCH") {
 		t.Errorf("expected WISHLIST MATCH banner in view, got:\n%s", view)
 	}
-	if !strings.Contains(view, "Press 's' to enter wishlist tab") {
-		t.Errorf("expected help text in view, got:\n%s", view)
+	if !strings.Contains(view, "[w] enter wishlist tab") {
+		t.Errorf("expected '[w] enter wishlist tab' in view, got:\n%s", view)
 	}
 }
 
@@ -1022,4 +1022,99 @@ func TestMainModel_ViewportBudgetingAndTruncation(t *testing.T) {
 		t.Errorf("expected MainModel.View() output <= 24 lines, got %d", len(lines))
 	}
 }
+
+func TestStoreSubTabNavigationKeys(t *testing.T) {
+	session := &models.Session{Region: "na", Shard: "na"}
+	m := NewMainModel(session)
+	m.loading = false
+
+	// Initial store sub-tab is Shop
+	if m.storeSubTab != SubTabShop {
+		t.Fatalf("expected initial SubTabShop, got %v", m.storeSubTab)
+	}
+
+	// Press 'w' -> Wishlist
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}})
+	m = updated.(MainModel)
+	if m.storeSubTab != SubTabWishlist {
+		t.Errorf("expected SubTabWishlist after pressing 'w', got %v", m.storeSubTab)
+	}
+
+	// Press 's' -> Shop
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = updated.(MainModel)
+	if m.storeSubTab != SubTabShop {
+		t.Errorf("expected SubTabShop after pressing 's', got %v", m.storeSubTab)
+	}
+
+	// Without night market data, pressing 'n' should stay on current sub-tab
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m = updated.(MainModel)
+	if m.storeSubTab != SubTabShop {
+		t.Errorf("expected to stay on SubTabShop when NightMarket is empty, got %v", m.storeSubTab)
+	}
+
+	// Enable night market data
+	m.nightModel = NewNightMarketModel([]models.ResolvedSkin{
+		{UUID: "nm-1", DisplayName: "Prime Vandal", CostVP: 1200},
+	}, []int{30})
+
+	// Now press 'n' -> NightMarket
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m = updated.(MainModel)
+	if m.storeSubTab != SubTabNightMarket {
+		t.Errorf("expected SubTabNightMarket after pressing 'n' with active NM, got %v", m.storeSubTab)
+	}
+}
+
+func TestStoreSubTabContextualLegends(t *testing.T) {
+	// 1. Shop without Night Market
+	shopModel := NewShopModel([]models.ResolvedSkin{
+		{UUID: "s1", DisplayName: "Prime Vandal", CostVP: 1775},
+	}, 3600)
+	shopModel.SetSize(80, 24)
+	shopView := shopModel.View()
+	if !strings.Contains(shopView, "[w] enter wishlist tab") {
+		t.Errorf("expected '[w] enter wishlist tab' in shop, got:\n%s", shopView)
+	}
+	if strings.Contains(shopView, "[n] enter nightmarket tab") {
+		t.Errorf("expected NO '[n] enter nightmarket tab' in shop without NM, got:\n%s", shopView)
+	}
+
+	// 2. Shop with Night Market
+	shopModel.SetNightMarketActive(true)
+	shopViewNM := shopModel.View()
+	if !strings.Contains(shopViewNM, "[w] enter wishlist tab") || !strings.Contains(shopViewNM, "[n] enter nightmarket tab") {
+		t.Errorf("expected both wishlist and nightmarket legends in shop with NM, got:\n%s", shopViewNM)
+	}
+
+	// 3. Wishlist without Night Market
+	wm := NewWishlistModel()
+	wm.SetSize(80, 24)
+	wView := wm.View()
+	if !strings.Contains(wView, "[s] enter shop tab") {
+		t.Errorf("expected '[s] enter shop tab' in wishlist, got:\n%s", wView)
+	}
+	if strings.Contains(wView, "[n] enter nightmarket tab") {
+		t.Errorf("expected NO '[n] enter nightmarket tab' in wishlist without NM, got:\n%s", wView)
+	}
+
+	// 4. Wishlist with Night Market
+	wm.SetNightMarketActive(true)
+	wViewNM := wm.View()
+	if !strings.Contains(wViewNM, "[s] enter shop tab") || !strings.Contains(wViewNM, "[n] enter nightmarket tab") {
+		t.Errorf("expected both shop and nightmarket legends in wishlist with NM, got:\n%s", wViewNM)
+	}
+
+	// 5. Night Market legends
+	nm := NewNightMarketModel([]models.ResolvedSkin{
+		{UUID: "nm1", DisplayName: "Magepunk Ghost", CostVP: 1000},
+	}, []int{20})
+	nm.SetSize(80, 24)
+	nmView := nm.View()
+	if !strings.Contains(nmView, "[s] enter shop tab") || !strings.Contains(nmView, "[w] enter wishlist tab") {
+		t.Errorf("expected '[s] enter shop tab' and '[w] enter wishlist tab' in Night Market view, got:\n%s", nmView)
+	}
+}
+
 

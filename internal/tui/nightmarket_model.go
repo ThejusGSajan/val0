@@ -79,7 +79,10 @@ func (m NightMarketModel) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	return header + "\n" + grid
+	helpBar := lipgloss.NewStyle().
+		Foreground(ColorMuted).
+		Render("  [s] enter shop tab  •  [w] enter wishlist tab")
+	return header + "\n" + grid + "\n\n" + helpBar
 }
 
 func (m NightMarketModel) HasData() bool {
