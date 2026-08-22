@@ -387,6 +387,7 @@ func (m WishlistModel) View() string {
 
 	// Build Sprite Preview (Right Pane)
 	previewSpr := ""
+	const previewTargetRows = 6
 	if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
 		selected := m.filtered[m.brCursor]
 		iconURL, fullRenderURL := resolveSkinImages(selected)
@@ -395,10 +396,10 @@ func (m WishlistModel) View() string {
 			targetURL = iconURL
 		}
 		if targetURL != "" && previewWidth >= 20 {
-			previewSpr = sprite.Render(targetURL, previewWidth)
+			previewSpr = sprite.Render(targetURL, previewWidth, previewTargetRows)
 		}
 	}
-	previewSpr = padSpriteToHeight(previewSpr, 6, previewWidth)
+	previewSpr = padSpriteToHeight(previewSpr, previewTargetRows, previewWidth, string(ColorBg))
 	previewBox := CardStyle.
 		BorderForeground(ColorBorder).
 		Width(previewWidth + 2).
