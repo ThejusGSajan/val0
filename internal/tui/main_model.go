@@ -508,7 +508,29 @@ func (m MainModel) View() string {
 	return AppStyle.Render(content)
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────
+func resolveSkinImages(asset models.SkinAsset) (iconURL string, fullRenderURL string) {
+	if len(asset.Chromas) > 0 {
+		if asset.Chromas[0].FullRender != nil && *asset.Chromas[0].FullRender != "" {
+			fullRenderURL = *asset.Chromas[0].FullRender
+		}
+		if asset.Chromas[0].DisplayIcon != nil && *asset.Chromas[0].DisplayIcon != "" {
+			iconURL = *asset.Chromas[0].DisplayIcon
+		}
+	}
+	if fullRenderURL == "" && asset.DisplayIcon != nil {
+		fullRenderURL = *asset.DisplayIcon
+	}
+	if iconURL == "" && asset.DisplayIcon != nil {
+		iconURL = *asset.DisplayIcon
+	}
+	if iconURL == "" && len(asset.Levels) > 0 && asset.Levels[0].DisplayIcon != nil {
+		iconURL = *asset.Levels[0].DisplayIcon
+	}
+	if fullRenderURL == "" {
+		fullRenderURL = iconURL
+	}
+	return iconURL, fullRenderURL
+}
 
 func formatNumber(n int) string {
 	in := fmt.Sprintf("%d", n)
@@ -686,21 +708,16 @@ func (m MainModel) loadData() tea.Msg {
 			tierUUID = *asset.ContentTierUUID
 		}
 
-		iconURL := ""
-		if asset.DisplayIcon != nil {
-			iconURL = *asset.DisplayIcon
-		}
-		if iconURL == "" && len(asset.Levels) > 0 && asset.Levels[0].DisplayIcon != nil {
-			iconURL = *asset.Levels[0].DisplayIcon
-		}
+		iconURL, fullRenderURL := resolveSkinImages(asset)
 
 		shopSkins = append(shopSkins, models.ResolvedSkin{
-			UUID:        asset.UUID,
-			DisplayName: asset.DisplayName,
-			Rarity:      RarityNameMap[tierUUID],
-			CostVP:      offer.Cost[vpUUID],
-			IconURL:     iconURL,
-			Sprite:      "", // Sprites are rendered dynamically by ShopModel.View() using current terminal width
+			UUID:          asset.UUID,
+			DisplayName:   asset.DisplayName,
+			Rarity:        RarityNameMap[tierUUID],
+			CostVP:        offer.Cost[vpUUID],
+			IconURL:       iconURL,
+			FullRenderURL: fullRenderURL,
+			Sprite:        "", // Sprites are rendered dynamically by ShopModel.View() using current terminal width
 		})
 	}
 
@@ -723,13 +740,7 @@ func (m MainModel) loadData() tea.Msg {
 				tierUUID = *asset.ContentTierUUID
 			}
 
-			iconURL := ""
-			if asset.DisplayIcon != nil {
-				iconURL = *asset.DisplayIcon
-			}
-			if iconURL == "" && len(asset.Levels) > 0 && asset.Levels[0].DisplayIcon != nil {
-				iconURL = *asset.Levels[0].DisplayIcon
-			}
+			iconURL, fullRenderURL := resolveSkinImages(asset)
 
 			cost := bo.Offer.Cost[vpUUID]
 			if len(bo.DiscountCosts) > 0 && bo.DiscountCosts[vpUUID] > 0 {
@@ -741,12 +752,13 @@ func (m MainModel) loadData() tea.Msg {
 			}
 
 			nightSkins = append(nightSkins, models.ResolvedSkin{
-				UUID:        asset.UUID,
-				DisplayName: asset.DisplayName,
-				Rarity:      RarityNameMap[tierUUID],
-				CostVP:      cost,
-				IconURL:     iconURL,
-				Sprite:      "", // Sprites are rendered dynamically
+				UUID:          asset.UUID,
+				DisplayName:   asset.DisplayName,
+				Rarity:        RarityNameMap[tierUUID],
+				CostVP:        cost,
+				IconURL:       iconURL,
+				FullRenderURL: fullRenderURL,
+				Sprite:        "", // Sprites are rendered dynamically
 			})
 			nmDiscounts = append(nmDiscounts, bo.DiscountPercent)
 		}

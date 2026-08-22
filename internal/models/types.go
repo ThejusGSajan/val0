@@ -163,14 +163,25 @@ type ValorantAPISkinsResponse struct {
 	Data   []SkinAsset `json:"data"`
 }
 
+// ── Skin Chroma (Variant) ───────────────────────────────────────────
+
+type SkinChroma struct {
+	UUID          string  `json:"uuid"`
+	DisplayName   string  `json:"displayName"`
+	DisplayIcon   *string `json:"displayIcon"`
+	FullRender    *string `json:"fullRender"`
+	Swatch        *string `json:"swatch"`
+	StreamedVideo *string `json:"streamedVideo"`
+}
+
 type SkinAsset struct {
-	UUID            string      `json:"uuid"`
-	DisplayName     string      `json:"displayName"`
-	ThemeUUID       string      `json:"themeUuid"`
-	ContentTierUUID *string     `json:"contentTierUuid"` // nil for base skins
-	DisplayIcon     *string     `json:"displayIcon"`     // URL, nullable
-	Chromas         []any       `json:"chromas"`
-	Levels          []SkinLevel `json:"levels"`
+	UUID            string       `json:"uuid"`
+	DisplayName     string       `json:"displayName"`
+	ThemeUUID       string       `json:"themeUuid"`
+	ContentTierUUID *string      `json:"contentTierUuid"` // nil for base skins
+	DisplayIcon     *string      `json:"displayIcon"`     // URL, nullable
+	Chromas         []SkinChroma `json:"chromas"`
+	Levels          []SkinLevel  `json:"levels"`
 }
 
 type SkinLevel struct {
@@ -204,10 +215,11 @@ type ContentTier struct {
 // ── Resolved Skin (display-ready after UUID → name + rarity lookup) ─
 
 type ResolvedSkin struct {
-	UUID        string
-	DisplayName string
-	Rarity      string // "Select", "Deluxe", "Premium", "Exclusive", "Ultra"
-	CostVP      int
-	IconURL     string
-	Sprite      string // pre-rendered ANSI block-character art
+	UUID          string
+	DisplayName   string
+	Rarity        string // "Select", "Deluxe", "Premium", "Exclusive", "Ultra"
+	CostVP        int
+	IconURL       string
+	FullRenderURL string
+	Sprite        string // pre-rendered ANSI block-character fallback
 }
