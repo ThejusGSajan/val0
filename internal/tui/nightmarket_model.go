@@ -79,9 +79,10 @@ func (m NightMarketModel) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	helpBar := lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		Render("  [s] enter shop tab  •  [w] enter wishlist tab")
+	helpBar := "  " + RenderKeyLegends(
+		[2]string{"s", "enter shop tab"},
+		[2]string{"w", "enter wishlist tab"},
+	)
 	return header + "\n" + grid + "\n\n" + helpBar
 }
 

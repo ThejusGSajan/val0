@@ -192,9 +192,10 @@ func (m MatchesModel) renderListView() string {
 		sb.WriteString(row + "\n")
 	}
 
-	sb.WriteString("\n" + lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		Render("  [↑]/[↓] select  •  [Enter] view match detail"))
+	sb.WriteString("\n  " + RenderKeyLegends(
+		[2]string{"↑/↓", "select"},
+		[2]string{"enter", "view match detail"},
+	))
 
 	return sb.String()
 }
@@ -207,7 +208,7 @@ func (m MatchesModel) renderDetailView() string {
 	}
 	item := m.items[m.cursor]
 	if item.Details == nil {
-		return fmt.Sprintf("  Loading match detail for %s...\n\n  Press [Esc] to go back.", item.MatchID)
+		return fmt.Sprintf("  Loading match detail for %s...\n\n  %s", item.MatchID, RenderKeyItem("esc", "go back"))
 	}
 
 	d := item.Details
@@ -253,9 +254,7 @@ func (m MatchesModel) renderDetailView() string {
 	// Render Round Timeline
 	sb.WriteString(m.renderRoundTimeline(d, myTeamID))
 
-	sb.WriteString("\n\n" + lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		Render("  Press [Esc] to return to match list"))
+	sb.WriteString("\n\n  " + RenderKeyItem("esc", "return to match list"))
 
 	return sb.String()
 }

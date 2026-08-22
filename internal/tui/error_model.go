@@ -40,8 +40,12 @@ func (m ErrorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ErrorModel) View() string {
+	legend := RenderKeyLegends(
+		[2]string{"r", "retry"},
+		[2]string{"q", "exit"},
+	)
 	if m.width <= 0 || m.height <= 0 {
-		return "\n  ✕  " + m.message + "\n\n  Press [r] to retry, [q] to exit.\n"
+		return "\n  ✕  " + m.message + "\n\n  " + legend + "\n"
 	}
 
 	boxWidth := m.width - 8
@@ -67,7 +71,7 @@ func (m ErrorModel) View() string {
 		Padding(padY, padX).
 		Width(boxWidth).
 		Align(lipgloss.Center).
-		Render("✕  " + m.message + "\n\nPress [r] to retry, [q] to exit.")
+		Render("✕  " + m.message + "\n\n" + legend)
 
 	return lipgloss.Place(m.width, m.height,
 		lipgloss.Center, lipgloss.Center, content)

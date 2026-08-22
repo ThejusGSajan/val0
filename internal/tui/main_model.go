@@ -484,8 +484,11 @@ func (m MainModel) View() string {
 
 	// ── Status Bar ──────────────────────────────────────────────
 	sb.WriteString("\n\n")
-	sb.WriteString(StatusBarStyle.Render(
-		"  [1-5] switch tabs  •  [←]/[→] prev/next  •  [r] refresh  •  [q] quit",
+	sb.WriteString("  " + RenderKeyLegends(
+		[2]string{"1-5", "switch tabs"},
+		[2]string{"←/→", "prev/next"},
+		[2]string{"r", "refresh"},
+		[2]string{"q", "quit"},
 	))
 
 	content := sb.String()
@@ -571,7 +574,8 @@ func (m MainModel) renderError() string {
 	if boxWidth < 28 {
 		boxWidth = 28
 	}
-	content := ErrorStyle.Copy().Width(boxWidth).Render(fmt.Sprintf("✕  %s\n\nPress [r] to retry, [q] to quit.", m.err.Error()))
+	errLegend := RenderKeyLegends([2]string{"r", "retry"}, [2]string{"q", "quit"})
+	content := ErrorStyle.Copy().Width(boxWidth).Render(fmt.Sprintf("✕  %s\n\n%s", m.err.Error(), errLegend))
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}

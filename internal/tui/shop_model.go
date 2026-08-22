@@ -110,14 +110,12 @@ func (m ShopModel) View() string {
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	sb.WriteString(grid + "\n")
 
-	var storeLegends []string
-	storeLegends = append(storeLegends, "[w] enter wishlist tab")
+	var storePairs [][2]string
+	storePairs = append(storePairs, [2]string{"w", "enter wishlist tab"})
 	if m.hasNightMarket {
-		storeLegends = append(storeLegends, "[n] enter nightmarket tab")
+		storePairs = append(storePairs, [2]string{"n", "enter nightmarket tab"})
 	}
-	sb.WriteString(lipgloss.NewStyle().
-		Foreground(ColorMuted).
-		Render("  " + strings.Join(storeLegends, "  •  ")))
+	sb.WriteString("  " + RenderKeyLegends(storePairs...))
 
 	return sb.String()
 }

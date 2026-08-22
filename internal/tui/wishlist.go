@@ -399,14 +399,19 @@ func (m WishlistModel) View() string {
 	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "    ", previewBox)
 	sb.WriteString(splitView + "\n\n")
 
-	var subNav []string
-	subNav = append(subNav, "[s] enter shop tab")
+	var wlPairs [][2]string
+	wlPairs = append(wlPairs, [2]string{"s", "enter shop tab"})
 	if m.hasNightMarket {
-		subNav = append(subNav, "[n] enter nightmarket tab")
+		wlPairs = append(wlPairs, [2]string{"n", "enter nightmarket tab"})
 	}
-
-	navLine := "  " + strings.Join(subNav, "  •  ") + "  •  [Tab] switch section  •  [↑]/[↓] navigate  •  Type to search  •  [Enter] add to wishlist  •  [x] remove"
-	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(navLine))
+	wlPairs = append(wlPairs,
+		[2]string{"tab", "switch section"},
+		[2]string{"↑/↓", "navigate"},
+		[2]string{"", "Type to search"},
+		[2]string{"enter", "add to wishlist"},
+		[2]string{"x", "remove"},
+	)
+	sb.WriteString("  " + RenderKeyLegends(wlPairs...))
 
 	return sb.String()
 }

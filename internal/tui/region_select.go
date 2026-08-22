@@ -88,11 +88,15 @@ func (m RegionSelectModel) View() string {
 		items.WriteString("\n")
 	}
 
+	legend := RenderKeyLegends(
+		[2]string{"↑/↓", "move"},
+		[2]string{"enter", "select"},
+	)
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ColorBorder).
 		Padding(1, 3).
-		Render(title + "\n" + subtitle + "\n\n" + items.String() + "\n[↑]/[↓] to move, [Enter] to select")
+		Render(title + "\n" + subtitle + "\n\n" + items.String() + "\n" + legend)
 
 	return lipgloss.Place(m.width, m.height,
 		lipgloss.Center, lipgloss.Center, box)
