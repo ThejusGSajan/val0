@@ -218,25 +218,25 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg { return RefreshMsg{} }
 		case "left", "h":
 			m.prevTab()
-			return m, nil
+			return m, tea.ClearScreen
 		case "right", "l":
 			m.nextTab()
-			return m, nil
+			return m, tea.ClearScreen
 		case "1":
 			m.activeTab = TabStore
-			return m, nil
+			return m, tea.ClearScreen
 		case "2":
 			m.activeTab = TabMatches
-			return m, nil
+			return m, tea.ClearScreen
 		case "3":
 			m.activeTab = TabStats
-			return m, nil
+			return m, tea.ClearScreen
 		case "4":
 			m.activeTab = TabProgress
-			return m, nil
+			return m, tea.ClearScreen
 		case "5":
 			m.activeTab = TabSession
-			return m, nil
+			return m, tea.ClearScreen
 		}
 
 		// Store sub-tab navigation
@@ -244,14 +244,15 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "s":
 				m.storeSubTab = SubTabShop
-				return m, nil
+				return m, tea.ClearScreen
 			case "w":
 				m.storeSubTab = SubTabWishlist
 				m.wishlistModel.Refresh()
-				return m, nil
+				return m, tea.ClearScreen
 			case "n":
 				if m.nightModel.HasData() {
 					m.storeSubTab = SubTabNightMarket
+					return m, tea.ClearScreen
 				}
 				return m, nil
 			}
