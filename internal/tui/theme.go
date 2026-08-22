@@ -83,6 +83,7 @@ var (
 	CardStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(ColorBorder).
+			Background(ColorBg).
 			Padding(0, 1).
 			MarginRight(1)
 
