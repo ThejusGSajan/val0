@@ -179,7 +179,7 @@ func (m SessionModel) View() string {
 	sb.WriteString(cardStyle.Render(cardContent.String()))
 	sb.WriteString("\n\n" + lipgloss.NewStyle().
 		Foreground(ColorMuted).
-		Render("  Session auto-tracks new matches played while Val-Tracker is running."))
+		Render("  Session auto-tracks new matches played while val0 is running."))
 
 	return sb.String()
 }

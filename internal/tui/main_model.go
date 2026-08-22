@@ -377,7 +377,7 @@ func (m MainModel) View() string {
 
 	// ── Header Bar ──────────────────────────────────────────────
 	var headerParts []string
-	headerParts = append(headerParts, TitleStyle.Render("⚡ VAL-TRACKER TUI"))
+	headerParts = append(headerParts, TitleStyle.Render("⚡ val0"))
 	regionTag := lipgloss.NewStyle().
 		Foreground(ColorMuted).
 		Render(fmt.Sprintf(" [%s]", strings.ToUpper(m.session.Region)))
