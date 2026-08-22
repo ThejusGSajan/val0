@@ -309,7 +309,7 @@ func (m WishlistModel) View() string {
 			listRows = append(listRows, lipgloss.NewStyle().Foreground(ColorMuted).Render("    No skins match your search."))
 		}
 	} else {
-		maxBrDisplay := 6
+		maxBrDisplay := 7
 		start := 0
 		if m.brCursor >= maxBrDisplay {
 			start = m.brCursor - maxBrDisplay + 1
@@ -376,13 +376,15 @@ func (m WishlistModel) View() string {
 		// [FIXED]: STATIC ANCHORING WITH TRUECOLOR
 		// Pad the list to maxBrDisplay rows, explicitly painting the background color
 		// so it doesn't default to the terminal's pure black.
-		actualItems := end - start
-		for i := actualItems; i < maxBrDisplay; i++ {
+		for i := len(listRows); i < 8; i++ {
 			styledEmptyLine := lipgloss.NewStyle().Background(lipgloss.Color("#0F1117")).Render(strings.Repeat(" ", listWidth))
 			listRows = append(listRows, styledEmptyLine)
 		}
 	}
 
+	for len(listRows) < 8 {
+		listRows = append(listRows, lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", listWidth)))
+	}
 	leftPane := strings.Join(listRows, "\n")
 
 	// Build Sprite Preview (Right Pane)
@@ -399,13 +401,43 @@ func (m WishlistModel) View() string {
 			previewSpr = sprite.Render(targetURL, previewWidth, previewTargetRows)
 		}
 	}
-	previewSpr = padSpriteToHeight(previewSpr, previewTargetRows, previewWidth, string(ColorBg))
+
+	isNativePreview := strings.Contains(previewSpr, "\x1bP") || strings.Contains(previewSpr, "\x1b_G") || strings.Contains(previewSpr, "\x1b]1337")
+	previewContent := ""
+	if isNativePreview {
+		emptyLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewWidth))
+		var lines []string
+		for i := 0; i < previewTargetRows; i++ {
+			lines = append(lines, emptyLine)
+		}
+		previewContent = strings.Join(lines, "\n")
+	} else {
+		previewContent = padSpriteToHeight(previewSpr, previewTargetRows, previewWidth, string(ColorBg))
+	}
+
 	previewBox := CardStyle.
 		BorderForeground(ColorBorder).
 		Width(previewWidth + 2).
-		Render(previewSpr)
+		Render(previewContent)
 
-	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "    ", previewBox)
+	if isNativePreview && previewSpr != "" {
+		pLines := strings.Split(previewBox, "\n")
+		if len(pLines) >= 7 {
+			cursorLeft := fmt.Sprintf("\x1b[%dD", previewWidth)
+			cursorUp := fmt.Sprintf("\x1b[%dA", previewTargetRows-1)
+			pLines[previewTargetRows] = pLines[previewTargetRows] + "\x1b7" + cursorLeft + cursorUp + previewSpr + "\x1b8"
+			previewBox = strings.Join(pLines, "\n")
+		}
+	}
+
+	spacerLine := lipgloss.NewStyle().Background(ColorBg).Render("    ")
+	var spacerLines []string
+	for i := 0; i < 8; i++ {
+		spacerLines = append(spacerLines, spacerLine)
+	}
+	middleSpacer := strings.Join(spacerLines, "\n")
+
+	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, middleSpacer, previewBox)
 	sb.WriteString(splitView + "\n\n")
 
 	var wlPairs [][2]string
