@@ -148,10 +148,14 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		content.WriteString(lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render("⭐ WISHLIST ITEM") + "\n")
 	}
 
-	// ANSI sprite (if available or dynamically rendered)
+	// ANSI sprite or Native Graphic
 	spr := ""
-	if skin.IconURL != "" && spriteWidth >= 20 {
-		spr = sprite.Render(skin.IconURL, spriteWidth)
+	renderTargetURL := skin.FullRenderURL
+	if renderTargetURL == "" {
+		renderTargetURL = skin.IconURL
+	}
+	if renderTargetURL != "" && spriteWidth >= 20 {
+		spr = sprite.Render(renderTargetURL, spriteWidth)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}

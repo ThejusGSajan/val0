@@ -380,14 +380,13 @@ func (m WishlistModel) View() string {
 	previewSpr := ""
 	if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
 		selected := m.filtered[m.brCursor]
-		iconURL := ""
-		if selected.DisplayIcon != nil {
-			iconURL = *selected.DisplayIcon
-		} else if len(selected.Levels) > 0 && selected.Levels[0].DisplayIcon != nil {
-			iconURL = *selected.Levels[0].DisplayIcon
+		iconURL, fullRenderURL := resolveSkinImages(selected)
+		targetURL := fullRenderURL
+		if targetURL == "" {
+			targetURL = iconURL
 		}
-		if iconURL != "" && previewWidth >= 20 {
-			previewSpr = sprite.Render(iconURL, previewWidth)
+		if targetURL != "" && previewWidth >= 20 {
+			previewSpr = sprite.Render(targetURL, previewWidth)
 		}
 	}
 	previewSpr = padSpriteToHeight(previewSpr, 6, previewWidth)
