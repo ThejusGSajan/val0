@@ -89,8 +89,7 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 		if clampedWidth < 20 {
 			clampedWidth = 20
 		}
-		resized := resize.Resize(uint(clampedWidth), 0, img, resize.Lanczos3)
-		result = renderHalfBlocks(resized)
+		result = renderHalfBlocks(img, clampedWidth, targetRows)
 	}
 
 	spriteMutex.Lock()
@@ -116,33 +115,61 @@ func fetchImage(url string) (image.Image, error) {
 	return img, err
 }
 
-func renderHalfBlocks(img image.Image) string {
-	bounds := img.Bounds()
-	width := bounds.Max.X - bounds.Min.X
-	height := bounds.Max.Y - bounds.Min.Y
+func renderHalfBlocks(img image.Image, targetWidth, targetRows int) string {
+	maxH := targetRows * 2
+	resized := resize.Thumbnail(uint(targetWidth), uint(maxH), img, resize.Lanczos3)
+	bounds := resized.Bounds()
+	w := bounds.Dx()
+	h := bounds.Dy()
 
-	var sb strings.Builder
-	for y := 0; y < height-1; y += 2 {
-		for x := 0; x < width; x++ {
-			r1, g1, b1, a1 := img.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
-			r2, g2, b2, a2 := img.At(bounds.Min.X+x, bounds.Min.Y+y+1).RGBA()
+	leftPad := (targetWidth - w) / 2
+	rightPad := targetWidth - w - leftPad
+	leftPadStr := strings.Repeat(" ", leftPad)
+	rightPadStr := strings.Repeat(" ", rightPad)
 
+	var renderedRows []string
+	for y := 0; y < h; y += 2 {
+		var sb strings.Builder
+		sb.WriteString("\x1b[48;2;15;17;23m") // TrueColor ColorBg #0F1117
+		sb.WriteString(leftPadStr)
+		for x := 0; x < w; x++ {
+			r1, g1, b1, a1 := resized.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
 			r1, g1, b1 = r1>>8, g1>>8, b1>>8
-			r2, g2, b2 = r2>>8, g2>>8, b2>>8
 
-			if a1>>8 < 32 && a2>>8 < 32 {
-				sb.WriteString(" ")
-			} else if a1>>8 < 32 {
-				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm▄\x1b[0m", r2, g2, b2))
-			} else if a2>>8 < 32 {
-				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm▀\x1b[0m", r1, g1, b1))
+			var r2, g2, b2, a2 uint32
+			if y+1 < h {
+				r2, g2, b2, a2 = resized.At(bounds.Min.X+x, bounds.Min.Y+y+1).RGBA()
+				r2, g2, b2 = r2>>8, g2>>8, b2>>8
+			}
+
+			if a1 < 32 && a2 < 32 {
+				sb.WriteString("\x1b[48;2;15;17;23m ")
+			} else if a1 < 32 {
+				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;15;17;23m▄", r2, g2, b2))
+			} else if a2 < 32 {
+				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;15;17;23m▀", r1, g1, b1))
 			} else {
-				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀\x1b[0m", r1, g1, b1, r2, g2, b2))
+				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀", r1, g1, b1, r2, g2, b2))
 			}
 		}
-		sb.WriteString("\n")
+		sb.WriteString(rightPadStr)
+		sb.WriteString("\x1b[0m")
+		renderedRows = append(renderedRows, sb.String())
 	}
-	return sb.String()
+
+	topPad := (targetRows - len(renderedRows)) / 2
+	bottomPad := targetRows - len(renderedRows) - topPad
+	bgEmptyLine := "\x1b[48;2;15;17;23m" + strings.Repeat(" ", targetWidth) + "\x1b[0m"
+
+	var finalLines []string
+	for i := 0; i < topPad; i++ {
+		finalLines = append(finalLines, bgEmptyLine)
+	}
+	finalLines = append(finalLines, renderedRows...)
+	for i := 0; i < bottomPad; i++ {
+		finalLines = append(finalLines, bgEmptyLine)
+	}
+	return strings.Join(finalLines, "\n")
 }
 
 func ClearCache() {

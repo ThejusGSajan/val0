@@ -16,7 +16,7 @@ func TestRenderHalfBlocks(t *testing.T) {
 		}
 	}
 
-	result := renderHalfBlocks(img)
+	result := renderHalfBlocks(img, 4, 2)
 	if result == "" {
 		t.Fatal("expected non-empty rendered string")
 	}
