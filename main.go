@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -10,6 +11,15 @@ import (
 )
 
 func main() {
+	// CLI Flag Parser
+	graphicsFlag := flag.String("graphics", "", "Force graphics protocol: sixel, kitty, iterm2, halfblock")
+	flag.Parse()
+
+	if *graphicsFlag != "" {
+		// Overwrite the environment variable so detect.go naturally picks it up
+		os.Setenv("VAL0_GRAPHICS", *graphicsFlag)
+	}
+
 	p := tea.NewProgram(tui.NewRootModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error running val0: %v\n", err)
