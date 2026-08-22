@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // ── Rarity Colors ───────────────────────────────────────────────────
 // Matched to the exact highlightColor hex from valorant-api.com/v1/contenttiers.
@@ -15,14 +19,14 @@ var (
 	ColorMuted     = lipgloss.Color("#6B7280")
 	ColorFg        = lipgloss.Color("#E5E7EB")
 	ColorBg        = lipgloss.Color("#0F1117")
-	ColorAccent    = lipgloss.Color("#FF4655") // Valorant red
+	ColorAccent    = lipgloss.Color("#EC666D") // val0 Coral/Rose theme
 	ColorBorder    = lipgloss.Color("#2A2D37")
-	ColorTabActive = lipgloss.Color("#FF4655")
+	ColorTabActive = lipgloss.Color("#EC666D")
 	ColorTabInact  = lipgloss.Color("#4B5563")
 
 	// Match outcomes
 	ColorWin  = lipgloss.Color("#22C55E") // Green
-	ColorLoss = lipgloss.Color("#EF4444") // Red
+	ColorLoss = lipgloss.Color("#EF4444") // Red (Defeat red - strictly preserved)
 	ColorDraw = lipgloss.Color("#9CA3AF") // Gray
 )
 
@@ -95,6 +99,11 @@ var (
 			Foreground(ColorMuted).
 			PaddingTop(1)
 
+	// Key legend styling
+	KeyNameStyle = lipgloss.NewStyle().Foreground(ColorAccent).Bold(true)
+	KeyDescStyle = lipgloss.NewStyle().Foreground(ColorMuted)
+	KeySepStyle  = lipgloss.NewStyle().Foreground(ColorMuted)
+
 	// Error screen
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#EF4444")).
@@ -108,6 +117,28 @@ var (
 	ProgressFullStyle  = lipgloss.NewStyle().Foreground(ColorAccent)
 	ProgressEmptyStyle = lipgloss.NewStyle().Foreground(ColorBorder)
 )
+
+// RenderKeyItem formats a single key and action pair: "<Key> <Desc>"
+// If key is empty, it returns the description in KeyDescStyle.
+func RenderKeyItem(key, desc string) string {
+	if key == "" {
+		return KeyDescStyle.Render(desc)
+	}
+	if desc == "" {
+		return KeyNameStyle.Render(key)
+	}
+	return KeyNameStyle.Render(key) + " " + KeyDescStyle.Render(desc)
+}
+
+// RenderKeyLegends joins multiple [2]string{key, desc} entries with " · "
+func RenderKeyLegends(pairs ...[2]string) string {
+	var rendered []string
+	for _, p := range pairs {
+		rendered = append(rendered, RenderKeyItem(p[0], p[1]))
+	}
+	sep := KeySepStyle.Render(" · ")
+	return strings.Join(rendered, sep)
+}
 
 // RarityStyle returns a lipgloss style that colors text by content tier UUID.
 func RarityStyle(contentTierUUID string) lipgloss.Style {

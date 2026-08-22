@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRarityStylesAndUUIDs(t *testing.T) {
@@ -41,3 +44,31 @@ func TestProgressBar(t *testing.T) {
 		t.Fatal("expected non-empty progress bar")
 	}
 }
+
+func TestKeyLegendRenderers(t *testing.T) {
+	single := RenderKeyItem("esc", "Close")
+	if !strings.Contains(single, "esc") || !strings.Contains(single, "Close") {
+		t.Fatalf("RenderKeyItem failed: %q", single)
+	}
+
+	joined := RenderKeyLegends(
+		[2]string{"↑/↓", "Scroll"},
+		[2]string{"esc", "Close"},
+	)
+	if !strings.Contains(joined, " · ") {
+		t.Fatalf("expected middle dot separator ' · ', got: %q", joined)
+	}
+}
+
+func TestColorPaletteConstraints(t *testing.T) {
+	if ColorAccent != lipgloss.Color("#EC666D") {
+		t.Fatalf("expected ColorAccent to be #EC666D, got: %v", ColorAccent)
+	}
+	if ColorTabActive != lipgloss.Color("#EC666D") {
+		t.Fatalf("expected ColorTabActive to be #EC666D, got: %v", ColorTabActive)
+	}
+	if ColorLoss != lipgloss.Color("#EF4444") {
+		t.Fatalf("expected ColorLoss (defeat red) to remain #EF4444, got: %v", ColorLoss)
+	}
+}
+
