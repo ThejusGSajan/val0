@@ -33,14 +33,14 @@ func TestRenderHalfBlocks(t *testing.T) {
 }
 
 func TestRender_EmptyURL(t *testing.T) {
-	res := Render("", 40)
+	res := Render("", 40, 4)
 	if res != "" {
 		t.Errorf("expected empty string for empty URL, got: %s", res)
 	}
 }
 
 func TestRender_WidthTooSmall(t *testing.T) {
-	res := Render("https://example.com/icon.png", 5)
+	res := Render("https://example.com/icon.png", 5, 4)
 	if res != "" {
 		t.Errorf("expected empty string for width < 10, got: %s", res)
 	}
@@ -65,7 +65,7 @@ func TestRenderSixelEncoding(t *testing.T) {
 
 func TestRenderKittyEncoding(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
-	kittyStr, err := renderKitty(img)
+	kittyStr, err := renderKitty(img, 4, 4)
 	if err != nil {
 		t.Fatalf("renderKitty failed: %v", err)
 	}
