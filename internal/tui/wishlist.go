@@ -373,12 +373,13 @@ func (m WishlistModel) View() string {
 			listRows = append(listRows, row)
 		}
 
-		// [NEW]: STATIC ANCHORING
-		// Pad the list so it ALWAYS has exactly maxBrDisplay rows. 
-		// This locks the right-hand preview box to a fixed vertical position, ensuring solid backgrounds overwrite old ghosts.
+		// [FIXED]: STATIC ANCHORING WITH TRUECOLOR
+		// Pad the list to maxBrDisplay rows, explicitly painting the background color
+		// so it doesn't default to the terminal's pure black.
 		actualItems := end - start
 		for i := actualItems; i < maxBrDisplay; i++ {
-			listRows = append(listRows, strings.Repeat(" ", listWidth))
+			styledEmptyLine := lipgloss.NewStyle().Background(lipgloss.Color("#0F1117")).Render(strings.Repeat(" ", listWidth))
+			listRows = append(listRows, styledEmptyLine)
 		}
 	}
 
