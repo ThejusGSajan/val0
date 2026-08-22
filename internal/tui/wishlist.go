@@ -390,6 +390,8 @@ func (m WishlistModel) View() string {
 	// Build Sprite Preview (Right Pane)
 	previewSpr := ""
 	const previewTargetRows = 6
+	previewContentWidth := previewWidth
+	cardBoxWidth := previewContentWidth + 4
 	if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
 		selected := m.filtered[m.brCursor]
 		iconURL, fullRenderURL := resolveSkinImages(selected)
@@ -397,33 +399,33 @@ func (m WishlistModel) View() string {
 		if targetURL == "" {
 			targetURL = iconURL
 		}
-		if targetURL != "" && previewWidth >= 20 {
-			previewSpr = sprite.Render(targetURL, previewWidth, previewTargetRows)
+		if targetURL != "" && previewContentWidth >= 20 {
+			previewSpr = sprite.Render(targetURL, previewContentWidth, previewTargetRows)
 		}
 	}
 
 	isNativePreview := strings.Contains(previewSpr, "\x1bP") || strings.Contains(previewSpr, "\x1b_G") || strings.Contains(previewSpr, "\x1b]1337")
 	previewContent := ""
 	if isNativePreview {
-		emptyLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewWidth))
+		emptyLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewContentWidth))
 		var lines []string
 		for i := 0; i < previewTargetRows; i++ {
 			lines = append(lines, emptyLine)
 		}
 		previewContent = strings.Join(lines, "\n")
 	} else {
-		previewContent = padSpriteToHeight(previewSpr, previewTargetRows, previewWidth, string(ColorBg))
+		previewContent = padSpriteToHeight(previewSpr, previewTargetRows, previewContentWidth, string(ColorBg))
 	}
 
 	previewBox := CardStyle.
 		BorderForeground(ColorBorder).
-		Width(previewWidth + 2).
+		Width(cardBoxWidth).
 		Render(previewContent)
 
 	if isNativePreview && previewSpr != "" {
 		pLines := strings.Split(previewBox, "\n")
 		if len(pLines) >= 7 {
-			cursorLeft := fmt.Sprintf("\x1b[%dD", previewWidth)
+			cursorLeft := fmt.Sprintf("\x1b[%dD", cardBoxWidth-2)
 			cursorUp := fmt.Sprintf("\x1b[%dA", previewTargetRows-1)
 			pLines[previewTargetRows] = pLines[previewTargetRows] + "\x1b7" + cursorLeft + cursorUp + previewSpr + "\x1b8"
 			previewBox = strings.Join(pLines, "\n")

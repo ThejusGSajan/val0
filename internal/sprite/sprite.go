@@ -3,7 +3,6 @@ package sprite
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
@@ -53,15 +52,13 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
 
-		// Create Solid Background Canvas (#0F1117)
+		// Create Transparent Background Canvas (A=0 everywhere)
 		canvas := image.NewRGBA(image.Rect(0, 0, targetPixelWidth, targetPixelHeight))
-		bgColor := color.RGBA{R: 15, G: 17, B: 23, A: 255}
-		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{bgColor}, image.Point{}, draw.Src)
 
 		// Center the resized weapon onto the canvas
 		offsetX := (targetPixelWidth - resized.Bounds().Dx()) / 2
 		offsetY := (targetPixelHeight - resized.Bounds().Dy()) / 2
-		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Over)
+		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Src)
 
 		// Encode the fully normalized canvas
 		switch proto {
