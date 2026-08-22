@@ -372,6 +372,14 @@ func (m WishlistModel) View() string {
 			}
 			listRows = append(listRows, row)
 		}
+
+		// [NEW]: STATIC ANCHORING
+		// Pad the list so it ALWAYS has exactly maxBrDisplay rows. 
+		// This locks the right-hand preview box to a fixed vertical position, ensuring solid backgrounds overwrite old ghosts.
+		actualItems := end - start
+		for i := actualItems; i < maxBrDisplay; i++ {
+			listRows = append(listRows, strings.Repeat(" ", listWidth))
+		}
 	}
 
 	leftPane := strings.Join(listRows, "\n")
