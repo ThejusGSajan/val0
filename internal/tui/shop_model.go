@@ -154,14 +154,14 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 	if renderTargetURL == "" {
 		renderTargetURL = skin.IconURL
 	}
+	const spriteTargetRows = 4 // fixed height for all sprite containers
 	if renderTargetURL != "" && spriteWidth >= 20 {
-		spr = sprite.Render(renderTargetURL, spriteWidth)
+		spr = sprite.Render(renderTargetURL, spriteWidth, spriteTargetRows)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}
 
-	const spriteTargetRows = 4 // fixed height for all sprite containers
-	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth)
+	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth, string(ColorBg))
 
 	if spr != "" {
 		content.WriteString(spr)
@@ -203,10 +203,11 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 // padSpriteToHeight ensures the sprite string occupies exactly `targetRows` lines.
 // If the sprite has fewer lines, blank lines are prepended (top-padding) to vertically center it.
 // If the sprite has more lines, it is truncated from the bottom.
-func padSpriteToHeight(spr string, targetRows int, width int) string {
+func padSpriteToHeight(spr string, targetRows int, width int, bgHex string) string {
+	bgStyle := lipgloss.NewStyle().Background(lipgloss.Color(bgHex))
+	emptyLine := bgStyle.Render(strings.Repeat(" ", width))
+
 	if spr == "" {
-		// Return empty box of targetRows × width spaces
-		emptyLine := strings.Repeat(" ", width)
 		lines := make([]string, targetRows)
 		for i := range lines {
 			lines[i] = emptyLine
@@ -217,7 +218,6 @@ func padSpriteToHeight(spr string, targetRows int, width int) string {
 	// [FIXED]: Sixel Post-Draw Architecture
 	// Protect Native Graphics from being overwritten by Lip Gloss background spaces.
 	if strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337") {
-		emptyLine := strings.Repeat(" ", width)
 		lines := make([]string, targetRows)
 
 		// 1. Give Lip Gloss pure spaces for the first (targetRows - 1) lines.
@@ -236,7 +236,8 @@ func padSpriteToHeight(spr string, targetRows int, width int) string {
 		// \x1b[%dA moves cursor UP by (targetRows - 1) lines.
 		cursorUp := fmt.Sprintf("\x1b[%dA", targetRows-1)
 
-		lines[targetRows-1] = emptyLine + cursorLeft + cursorUp + spr
+		// DEC Save cursor (\x1b7), jump up-left, emit payload, DEC Restore cursor (\x1b8)
+		lines[targetRows-1] = emptyLine + "\x1b7" + cursorLeft + cursorUp + spr + "\x1b8"
 
 		return strings.Join(lines, "\n")
 	}
@@ -248,7 +249,6 @@ func padSpriteToHeight(spr string, targetRows int, width int) string {
 	// Center vertically
 	topPad := (targetRows - len(lines)) / 2
 	bottomPad := targetRows - len(lines) - topPad
-	emptyLine := strings.Repeat(" ", width)
 	var result []string
 	for i := 0; i < topPad; i++ {
 		result = append(result, emptyLine)
