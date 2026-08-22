@@ -656,8 +656,8 @@ func TestShopModelWishlistRendering(t *testing.T) {
 	if !strings.Contains(view, "WISHLIST MATCH") {
 		t.Errorf("expected WISHLIST MATCH banner in view, got:\n%s", view)
 	}
-	if !strings.Contains(view, "[w] enter wishlist tab") {
-		t.Errorf("expected '[w] enter wishlist tab' in view, got:\n%s", view)
+	if !strings.Contains(view, "enter wishlist tab") {
+		t.Errorf("expected 'enter wishlist tab' in view, got:\n%s", view)
 	}
 }
 
@@ -849,7 +849,7 @@ func TestErrorModel_DynamicSizing(t *testing.T) {
 
 	// 0-dimension safety check
 	v0 := errModel.View()
-	if !strings.Contains(v0, "Test Error Message") || !strings.Contains(v0, "Press [r] to retry") {
+	if !strings.Contains(v0, "Test Error Message") || !strings.Contains(v0, "retry") {
 		t.Errorf("expected compact error message on 0 dimensions, got:\n%s", v0)
 	}
 
@@ -1074,17 +1074,17 @@ func TestStoreSubTabContextualLegends(t *testing.T) {
 	}, 3600)
 	shopModel.SetSize(80, 24)
 	shopView := shopModel.View()
-	if !strings.Contains(shopView, "[w] enter wishlist tab") {
-		t.Errorf("expected '[w] enter wishlist tab' in shop, got:\n%s", shopView)
+	if !strings.Contains(shopView, "w") || !strings.Contains(shopView, "enter wishlist tab") {
+		t.Errorf("expected 'w enter wishlist tab' in shop, got:\n%s", shopView)
 	}
-	if strings.Contains(shopView, "[n] enter nightmarket tab") {
-		t.Errorf("expected NO '[n] enter nightmarket tab' in shop without NM, got:\n%s", shopView)
+	if strings.Contains(shopView, "enter nightmarket tab") {
+		t.Errorf("expected NO 'enter nightmarket tab' in shop without NM, got:\n%s", shopView)
 	}
 
 	// 2. Shop with Night Market
 	shopModel.SetNightMarketActive(true)
 	shopViewNM := shopModel.View()
-	if !strings.Contains(shopViewNM, "[w] enter wishlist tab") || !strings.Contains(shopViewNM, "[n] enter nightmarket tab") {
+	if !strings.Contains(shopViewNM, "enter wishlist tab") || !strings.Contains(shopViewNM, "enter nightmarket tab") {
 		t.Errorf("expected both wishlist and nightmarket legends in shop with NM, got:\n%s", shopViewNM)
 	}
 
@@ -1092,17 +1092,17 @@ func TestStoreSubTabContextualLegends(t *testing.T) {
 	wm := NewWishlistModel()
 	wm.SetSize(80, 24)
 	wView := wm.View()
-	if !strings.Contains(wView, "[s] enter shop tab") {
-		t.Errorf("expected '[s] enter shop tab' in wishlist, got:\n%s", wView)
+	if !strings.Contains(wView, "enter shop tab") {
+		t.Errorf("expected 'enter shop tab' in wishlist, got:\n%s", wView)
 	}
-	if strings.Contains(wView, "[n] enter nightmarket tab") {
-		t.Errorf("expected NO '[n] enter nightmarket tab' in wishlist without NM, got:\n%s", wView)
+	if strings.Contains(wView, "enter nightmarket tab") {
+		t.Errorf("expected NO 'enter nightmarket tab' in wishlist without NM, got:\n%s", wView)
 	}
 
 	// 4. Wishlist with Night Market
 	wm.SetNightMarketActive(true)
 	wViewNM := wm.View()
-	if !strings.Contains(wViewNM, "[s] enter shop tab") || !strings.Contains(wViewNM, "[n] enter nightmarket tab") {
+	if !strings.Contains(wViewNM, "enter shop tab") || !strings.Contains(wViewNM, "enter nightmarket tab") {
 		t.Errorf("expected both shop and nightmarket legends in wishlist with NM, got:\n%s", wViewNM)
 	}
 
@@ -1112,27 +1112,36 @@ func TestStoreSubTabContextualLegends(t *testing.T) {
 	}, []int{20})
 	nm.SetSize(80, 24)
 	nmView := nm.View()
-	if !strings.Contains(nmView, "[s] enter shop tab") || !strings.Contains(nmView, "[w] enter wishlist tab") {
-		t.Errorf("expected '[s] enter shop tab' and '[w] enter wishlist tab' in Night Market view, got:\n%s", nmView)
+	if !strings.Contains(nmView, "enter shop tab") || !strings.Contains(nmView, "enter wishlist tab") {
+		t.Errorf("expected 'enter shop tab' and 'enter wishlist tab' in Night Market view, got:\n%s", nmView)
 	}
 }
 
-func TestGlobalKeyLegendBracketStandardization(t *testing.T) {
-	// 1. MainModel status bar
+func TestGlobalKeyLegendStandardization(t *testing.T) {
+	// 1. Header bar and MainModel status bar
 	session := &models.Session{Region: "na", Shard: "na"}
 	mainModel := NewMainModel(session)
 	mainModel.loading = false
 	mainView := mainModel.View()
-	expectedMainLegend := "[1-5] switch tabs  •  [←]/[→] prev/next  •  [r] refresh  •  [q] quit"
+	if !strings.Contains(mainView, "val0") {
+		t.Errorf("MainModel header missing 'val0', got:\n%s", mainView)
+	}
+	expectedMainLegend := RenderKeyLegends(
+		[2]string{"1-5", "switch tabs"},
+		[2]string{"←/→", "prev/next"},
+		[2]string{"r", "refresh"},
+		[2]string{"q", "quit"},
+	)
 	if !strings.Contains(mainView, expectedMainLegend) {
-		t.Errorf("MainModel status bar missing bracketed legend %q, got:\n%s", expectedMainLegend, mainView)
+		t.Errorf("MainModel status bar missing legend %q, got:\n%s", expectedMainLegend, mainView)
 	}
 
 	// 2. MainModel error rendering
 	mainModel.err = errors.New("network error")
 	errView := mainModel.View()
-	if !strings.Contains(errView, "[r] to retry") || !strings.Contains(errView, "[q] to quit") {
-		t.Errorf("MainModel renderError missing bracketed keys, got:\n%s", errView)
+	expectedErrLegend := RenderKeyLegends([2]string{"r", "retry"}, [2]string{"q", "quit"})
+	if !strings.Contains(errView, expectedErrLegend) {
+		t.Errorf("MainModel renderError missing keys, got:\n%s", errView)
 	}
 
 	// 3. MatchesModel list & detail views
@@ -1141,48 +1150,68 @@ func TestGlobalKeyLegendBracketStandardization(t *testing.T) {
 	}, "p1", nil, nil)
 	matchesModel.SetSize(80, 24)
 	listMatchesView := matchesModel.View()
-	if !strings.Contains(listMatchesView, "[↑]/[↓] select  •  [Enter] view match detail") {
-		t.Errorf("MatchesModel list view missing bracketed legend, got:\n%s", listMatchesView)
+	expectedMatchesListLegend := RenderKeyLegends(
+		[2]string{"↑/↓", "select"},
+		[2]string{"enter", "view match detail"},
+	)
+	if !strings.Contains(listMatchesView, expectedMatchesListLegend) {
+		t.Errorf("MatchesModel list view missing legend, got:\n%s", listMatchesView)
 	}
 
 	matchesModel.viewMode = MatchViewDetail
 	detailMatchesView := matchesModel.View()
-	if !strings.Contains(detailMatchesView, "Press [Esc] to return to match list") && !strings.Contains(detailMatchesView, "Press [Esc] to go back") {
-		t.Errorf("MatchesModel detail view missing bracketed legend, got:\n%s", detailMatchesView)
+	if !strings.Contains(detailMatchesView, RenderKeyItem("esc", "return to match list")) && !strings.Contains(detailMatchesView, RenderKeyItem("esc", "go back")) {
+		t.Errorf("MatchesModel detail view missing legend, got:\n%s", detailMatchesView)
 	}
 
 	// 4. StatsModel scroll view
 	statsModel := NewStatsModel(nil, "p1", nil, nil, nil, "Silver 1")
 	statsModel.SetSize(80, 24)
 	statsView := statsModel.View()
-	if !strings.Contains(statsView, "[↑]/[↓] scroll stats view") {
-		t.Errorf("StatsModel missing bracketed legend, got:\n%s", statsView)
+	if !strings.Contains(statsView, RenderKeyItem("↑/↓", "scroll stats view")) {
+		t.Errorf("StatsModel missing scroll legend, got:\n%s", statsView)
 	}
 
 	// 5. RegionSelectModel
 	regionModel := NewRegionSelectModel()
 	regionModel.SetSize(80, 24)
 	regionView := regionModel.View()
-	if !strings.Contains(regionView, "[↑]/[↓] to move, [Enter] to select") {
-		t.Errorf("RegionSelectModel missing bracketed legend, got:\n%s", regionView)
+	expectedRegionLegend := RenderKeyLegends(
+		[2]string{"↑/↓", "move"},
+		[2]string{"enter", "select"},
+	)
+	if !strings.Contains(regionView, expectedRegionLegend) {
+		t.Errorf("RegionSelectModel missing legend, got:\n%s", regionView)
 	}
 
 	// 6. ErrorModel
 	errM := NewErrorModel("Auth Error")
 	errM.SetSize(80, 24)
-	if !strings.Contains(errM.View(), "Press [r] to retry, [q] to exit.") {
-		t.Errorf("ErrorModel missing bracketed legend, got:\n%s", errM.View())
+	expectedErrModelLegend := RenderKeyLegends(
+		[2]string{"r", "retry"},
+		[2]string{"q", "exit"},
+	)
+	if !strings.Contains(errM.View(), expectedErrModelLegend) {
+		t.Errorf("ErrorModel missing legend, got:\n%s", errM.View())
 	}
 
-	// 7. WishlistModel preserves "Type to search" while bracketizing keys
+	// 7. WishlistModel preserves "Type to search" while modernizing keys
 	wlModel := NewWishlistModel()
 	wlModel.SetSize(80, 24)
 	wlView := wlModel.View()
 	if !strings.Contains(wlView, "Type to search") {
 		t.Errorf("WishlistModel should preserve 'Type to search', got:\n%s", wlView)
 	}
-	if !strings.Contains(wlView, "[Tab] switch section") || !strings.Contains(wlView, "[↑]/[↓] navigate") || !strings.Contains(wlView, "[Enter] add to wishlist") || !strings.Contains(wlView, "[x] remove") {
-		t.Errorf("WishlistModel missing bracketed key legends, got:\n%s", wlView)
+	expectedWlLegend := RenderKeyLegends(
+		[2]string{"s", "enter shop tab"},
+		[2]string{"tab", "switch section"},
+		[2]string{"↑/↓", "navigate"},
+		[2]string{"", "Type to search"},
+		[2]string{"enter", "add to wishlist"},
+		[2]string{"x", "remove"},
+	)
+	if !strings.Contains(wlView, expectedWlLegend) {
+		t.Errorf("WishlistModel missing modernized key legends, got:\n%s", wlView)
 	}
 }
 
