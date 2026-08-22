@@ -495,10 +495,20 @@ func (m MainModel) View() string {
 	content := sb.String()
 	if m.width > 0 && m.height > 0 {
 		lines := strings.Split(content, "\n")
-		if len(lines) > m.height {
+
+		// [NEW]: STRICT VIEWPORT PADDING
+		// Actively overwrite trailing terminal rows with pure background-colored space.
+		if len(lines) < m.height {
+			padding := m.height - len(lines)
+			emptyLine := strings.Repeat(" ", m.width)
+			for i := 0; i < padding; i++ {
+				lines = append(lines, emptyLine)
+			}
+		} else if len(lines) > m.height {
 			lines = lines[:m.height]
-			content = strings.Join(lines, "\n")
 		}
+
+		content = strings.Join(lines, "\n")
 		rendered := AppStyle.Render(content)
 		return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,
 			rendered,
