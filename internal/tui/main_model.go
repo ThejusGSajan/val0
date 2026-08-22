@@ -496,13 +496,13 @@ func (m MainModel) View() string {
 	if m.width > 0 && m.height > 0 {
 		lines := strings.Split(content, "\n")
 
-		// [NEW]: STRICT VIEWPORT PADDING
-		// Actively overwrite trailing terminal rows with pure background-colored space.
+		// [FIXED]: STRICT VIEWPORT PADDING WITH TRUECOLOR
 		if len(lines) < m.height {
 			padding := m.height - len(lines)
-			emptyLine := strings.Repeat(" ", m.width)
+			// Explicitly style the viewport wipe with the global App Background
+			styledEmptyLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", m.width))
 			for i := 0; i < padding; i++ {
-				lines = append(lines, emptyLine)
+				lines = append(lines, styledEmptyLine)
 			}
 		} else if len(lines) > m.height {
 			lines = lines[:m.height]
