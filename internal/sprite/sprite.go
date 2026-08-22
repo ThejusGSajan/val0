@@ -3,6 +3,8 @@ package sprite
 import (
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
 	"net/http"
@@ -41,29 +43,42 @@ func Render(iconURL string, widthCols int) string {
 	}
 
 	var result string
+	if proto != ProtocolHalfBlock {
+		// 1B & 2A: Fixed Canvas Normalization
+		targetPixelWidth := widthCols * 9
+		targetPixelHeight := 80 // Exactly 4 terminal rows (approx 20px per row)
 
-	switch proto {
-	case ProtocolSixel:
-		targetPixelWidth := uint(widthCols * 9)
-		resized := resize.Resize(targetPixelWidth, 0, img, resize.Lanczos3)
-		if sixelStr, err := renderSixel(resized); err == nil {
-			result = sixelStr
-		}
-	case ProtocolKitty:
-		targetPixelWidth := uint(widthCols * 10)
-		resized := resize.Resize(targetPixelWidth, 0, img, resize.Lanczos3)
-		if kittyStr, err := renderKitty(resized); err == nil {
-			result = kittyStr
-		}
-	case ProtocolITerm2:
-		targetPixelWidth := uint(widthCols * 10)
-		resized := resize.Resize(targetPixelWidth, 0, img, resize.Lanczos3)
-		if itermStr, err := renderITerm2(resized, widthCols); err == nil {
-			result = itermStr
+		// Resize preserving aspect ratio to fit inside bounding box
+		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
+
+		// Create Solid Background Canvas (#0F1117)
+		canvas := image.NewRGBA(image.Rect(0, 0, targetPixelWidth, targetPixelHeight))
+		bgColor := color.RGBA{R: 15, G: 17, B: 23, A: 255}
+		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{bgColor}, image.Point{}, draw.Src)
+
+		// Center the resized weapon onto the canvas
+		offsetX := (targetPixelWidth - resized.Bounds().Dx()) / 2
+		offsetY := (targetPixelHeight - resized.Bounds().Dy()) / 2
+		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Over)
+
+		// Encode the fully normalized canvas
+		switch proto {
+		case ProtocolSixel:
+			if str, err := renderSixel(canvas); err == nil {
+				result = str
+			}
+		case ProtocolKitty:
+			if str, err := renderKitty(canvas); err == nil {
+				result = str
+			}
+		case ProtocolITerm2:
+			if str, err := renderITerm2(canvas, widthCols); err == nil {
+				result = str
+			}
 		}
 	}
 
-	// Fallback to ANSI Half-Blocks if native protocol failed or is ProtocolHalfBlock
+	// Fallback to ANSI Half-Blocks if native protocol failed or unsupported
 	if result == "" {
 		clampedWidth := widthCols
 		if clampedWidth > 55 {
