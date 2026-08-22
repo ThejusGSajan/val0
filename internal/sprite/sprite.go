@@ -22,13 +22,13 @@ var (
 
 // Render downloads the image at iconURL and renders it using the best
 // available terminal graphics protocol (Sixel, Kitty, iTerm2, or ANSI half-blocks).
-func Render(iconURL string, widthCols int) string {
-	if iconURL == "" || widthCols < 10 {
+func Render(iconURL string, widthCols int, targetRows int) string {
+	if iconURL == "" || widthCols < 10 || targetRows <= 0 {
 		return ""
 	}
 
 	proto := DetectTerminalProtocol()
-	cacheKey := fmt.Sprintf("%s:%d:%s", iconURL, widthCols, proto.String())
+	cacheKey := fmt.Sprintf("%s:%d:%d:%s", iconURL, widthCols, targetRows, proto.String())
 
 	spriteMutex.Lock()
 	if cached, ok := spriteMap[cacheKey]; ok {
@@ -45,8 +45,10 @@ func Render(iconURL string, widthCols int) string {
 	var result string
 	if proto != ProtocolHalfBlock {
 		// 1B & 2A: Fixed Canvas Normalization
-		targetPixelWidth := widthCols * 9
-		targetPixelHeight := 80 // Exactly 4 terminal rows (approx 20px per row)
+		const cellW = 8
+		const cellH = 20
+		targetPixelWidth := widthCols * cellW
+		targetPixelHeight := targetRows * cellH
 
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
@@ -68,7 +70,7 @@ func Render(iconURL string, widthCols int) string {
 				result = str
 			}
 		case ProtocolKitty:
-			if str, err := renderKitty(canvas); err == nil {
+			if str, err := renderKitty(canvas, widthCols, targetRows); err == nil {
 				result = str
 			}
 		case ProtocolITerm2:
