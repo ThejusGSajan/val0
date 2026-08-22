@@ -126,6 +126,14 @@ func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardWidth int, sp
 }
 
 func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int, inWishlist bool) string {
+	if cardWidth <= 0 {
+		cardWidth = 44
+	}
+	cardContentWidth := cardWidth - 4
+	if cardContentWidth < 10 {
+		cardContentWidth = 10
+	}
+
 	// Get rarity color
 	rarityColor := ColorMuted
 	for uuid, name := range RarityNameMap {
@@ -140,12 +148,14 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		Foreground(rarityColor).
 		Italic(true)
 
-	// Build card content
+	// Build card content - STRICT 8-LINE INVARIANT
 	var content strings.Builder
 
-	// Wishlist indicator tag
+	// Line 0: Wishlist header slot (always 1 line)
 	if inWishlist {
-		content.WriteString(lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render("⭐ WISHLIST ITEM") + "\n")
+		content.WriteString(lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render(truncate("⭐ WISHLIST ITEM", cardContentWidth)) + "\n")
+	} else {
+		content.WriteString(lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth)) + "\n")
 	}
 
 	// ANSI sprite or Native Graphic
@@ -155,49 +165,70 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		renderTargetURL = skin.IconURL
 	}
 	const spriteTargetRows = 4 // fixed height for all sprite containers
-	if renderTargetURL != "" && spriteWidth >= 20 {
-		spr = sprite.Render(renderTargetURL, spriteWidth, spriteTargetRows)
+	if renderTargetURL != "" && cardContentWidth >= 20 {
+		spr = sprite.Render(renderTargetURL, cardContentWidth, spriteTargetRows)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}
 
-	spr = padSpriteToHeight(spr, spriteTargetRows, spriteWidth, string(ColorBg))
-
-	if spr != "" {
-		content.WriteString(spr)
-		content.WriteString("\n")
+	isNative := strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337")
+	if isNative {
+		// Post-Border Overlay: Output 4 clean background-styled lines to Lipgloss
+		emptySpriteLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth))
+		for i := 0; i < spriteTargetRows; i++ {
+			content.WriteString(emptySpriteLine + "\n")
+		}
+	} else {
+		// Half-block fallback
+		spr = padSpriteToHeight(spr, spriteTargetRows, cardContentWidth, string(ColorBg))
+		content.WriteString(spr + "\n")
 	}
 
-	// Skin name
-	content.WriteString(nameStyle.Render(skin.DisplayName))
+	// Line 5: Skin name
+	content.WriteString(nameStyle.Render(truncate(skin.DisplayName, cardContentWidth)))
 	content.WriteString("\n")
 
-	// Rarity tag
+	// Line 6: Rarity tag
 	if skin.Rarity != "" {
-		content.WriteString(rarityTagStyle.Render("● " + skin.Rarity + " Edition"))
-		content.WriteString("\n")
+		content.WriteString(rarityTagStyle.Render(truncate("● "+skin.Rarity+" Edition", cardContentWidth)))
+	} else {
+		content.WriteString(lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth)))
 	}
+	content.WriteString("\n")
 
-	// Price
+	// Line 7: Price
 	priceStr := fmt.Sprintf("VP %d", skin.CostVP)
 	if discountPct > 0 {
 		priceStr = fmt.Sprintf("VP %d  (-%d%%)", skin.CostVP, discountPct)
 	}
 	content.WriteString(VPBadgeStyle.Render(priceStr))
 
-	if cardWidth <= 0 {
-		cardWidth = 44
-	}
-
 	borderCol := rarityColor
 	if inWishlist {
 		borderCol = ColorUltra // Gold border for wishlist matches
 	}
 
-	return CardStyle.
+	cardBox := CardStyle.
 		BorderForeground(borderCol).
 		Width(cardWidth).
 		Render(content.String())
+
+	// Post-Border Overlay Injection for Native Graphics
+	if isNative && spr != "" {
+		cardLines := strings.Split(cardBox, "\n")
+		// In a 10-line card box:
+		// Line 0: Top Border
+		// Line 1: Header
+		// Line 2..5: Sprite rows (Line 5 is the final sprite row)
+		if len(cardLines) >= 6 {
+			cursorLeft := fmt.Sprintf("\x1b[%dD", cardWidth-2)
+			cursorUp := "\x1b[3A"
+			cardLines[5] = cardLines[5] + "\x1b7" + cursorLeft + cursorUp + spr + "\x1b8"
+			cardBox = strings.Join(cardLines, "\n")
+		}
+	}
+
+	return cardBox
 }
 
 // padSpriteToHeight ensures the sprite string occupies exactly `targetRows` lines.
