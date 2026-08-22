@@ -213,6 +213,21 @@ func padSpriteToHeight(spr string, targetRows int, width int) string {
 		}
 		return strings.Join(lines, "\n")
 	}
+
+	// Protect Sixel/Kitty/OSC sequences from strings.Split
+	if strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337") {
+		// Native graphics physically move the cursor down 4 rows (80px),
+		// but Lip Gloss needs placeholder characters to measure string bounds correctly.
+		emptyLine := strings.Repeat(" ", width)
+		lines := make([]string, targetRows)
+		lines[0] = spr + emptyLine
+		for i := 1; i < targetRows; i++ {
+			lines[i] = emptyLine
+		}
+		// Wrap the sequence so Lip Gloss allocates a (width x 4) text block over the image area.
+		return strings.Join(lines, "\n")
+	}
+
 	lines := strings.Split(strings.TrimRight(spr, "\n"), "\n")
 	if len(lines) > targetRows {
 		lines = lines[:targetRows]
