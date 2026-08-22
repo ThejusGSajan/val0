@@ -214,23 +214,30 @@ func padSpriteToHeight(spr string, targetRows int, width int) string {
 		return strings.Join(lines, "\n")
 	}
 
-	// Protect Native Graphics & Restore Cursor
-	// If the string contains a native graphic DCS/OSC sequence (Sixel, Kitty, iTerm2):
+	// [FIXED]: Sixel Post-Draw Architecture
+	// Protect Native Graphics from being overwritten by Lip Gloss background spaces.
 	if strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337") {
 		emptyLine := strings.Repeat(" ", width)
 		lines := make([]string, targetRows)
 
-		// Sixel physically moves the cursor down `targetRows` lines.
-		// We MUST move the cursor UP by (targetRows - 1) so Lip Gloss horizontal joins don't shatter.
-		cursorUp := fmt.Sprintf("\x1b[%dA", targetRows-1)
-
-		// Row 0 draws the image, immediately shifts the cursor back up, and prints the Lip Gloss spacer.
-		lines[0] = spr + cursorUp + emptyLine
-
-		// Remaining rows are pure structural spacers for Lip Gloss height calculations.
-		for i := 1; i < targetRows; i++ {
+		// 1. Give Lip Gloss pure spaces for the first (targetRows - 1) lines.
+		// The terminal will print these spaces and paint the background color normally.
+		for i := 0; i < targetRows-1; i++ {
 			lines[i] = emptyLine
 		}
+
+		// 2. On the final line, we print the Lip Gloss spaces, and then physically move
+		// the terminal cursor backward over the newly painted spaces, up to the top of
+		// the card, and THEN execute the Sixel payload to draw on top of the spaces.
+
+		// \x1b[%dD moves cursor LEFT by `width` columns.
+		cursorLeft := fmt.Sprintf("\x1b[%dD", width)
+
+		// \x1b[%dA moves cursor UP by (targetRows - 1) lines.
+		cursorUp := fmt.Sprintf("\x1b[%dA", targetRows-1)
+
+		lines[targetRows-1] = emptyLine + cursorLeft + cursorUp + spr
+
 		return strings.Join(lines, "\n")
 	}
 
