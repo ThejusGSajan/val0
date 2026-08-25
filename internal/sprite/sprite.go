@@ -75,7 +75,10 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 		const cellW = 10
 		const cellH = 20
 		targetPixelWidth := widthCols * cellW
-		targetPixelHeight := targetRows * cellH
+		targetPixelHeight := targetRows*cellH - 4 // Clip 4px to prevent row overflow
+		if targetPixelHeight < cellH {
+			targetPixelHeight = cellH
+		}
 
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
