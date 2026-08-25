@@ -46,17 +46,16 @@ func (m NightMarketModel) View() string {
 	if m.width >= 140 {
 		cols = 3
 	}
-	cardWidth := 44
+	cardContentWidth := 40
 	if m.width > 0 {
-		cardWidth = (m.width / cols) - 3
+		cardContentWidth = (m.width / cols) - 8
 	}
-	if cardWidth > 60 {
-		cardWidth = 60
+	if cardContentWidth > 40 {
+		cardContentWidth = 40
 	}
-	if cardWidth < 30 {
-		cardWidth = 30
+	if cardContentWidth < 20 {
+		cardContentWidth = 20
 	}
-	spriteW := cardWidth - 4
 
 	var cards []string
 	for i, skin := range m.skins {
@@ -64,7 +63,7 @@ func (m NightMarketModel) View() string {
 		if i < len(m.discounts) {
 			disc = m.discounts[i]
 		}
-		cards = append(cards, renderSkinCard(skin, disc, cardWidth, spriteW))
+		cards = append(cards, renderSkinCard(skin, disc, cardContentWidth))
 	}
 
 	// Night market has 6 items — cols x rows grid

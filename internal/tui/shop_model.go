@@ -76,24 +76,23 @@ func (m ShopModel) View() string {
 		Render(fmt.Sprintf("  ⏱  Resets in %dh %dm", hours, minutes))
 	sb.WriteString(timer + "\n")
 
-	// Dynamic sizing calculation
-	cardWidth := 44
+	// Dynamic sizing calculation - cardContentWidth is exact inner content width
+	cardContentWidth := 40
 	if m.width > 0 {
-		cardWidth = int(float64(m.width/2) * 0.6)
+		cardContentWidth = (m.width / 2) - 8
 	}
-	if cardWidth > 45 {
-		cardWidth = 45
+	if cardContentWidth > 40 {
+		cardContentWidth = 40
 	}
-	if cardWidth < 25 {
-		cardWidth = 25
+	if cardContentWidth < 20 {
+		cardContentWidth = 20
 	}
-	spriteW := cardWidth - 4
 
 	// Render each skin as a card
 	var cards []string
 	for _, skin := range m.skins {
 		inWishlist := cache.IsInWishlist(skin.UUID)
-		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardWidth, spriteW, inWishlist))
+		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist))
 	}
 
 	// Layout: 2 × 2 grid if we have 4 skins (the standard daily shop)
@@ -121,17 +120,13 @@ func (m ShopModel) View() string {
 }
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
-func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int) string {
-	return renderSkinCardWithWishlist(skin, discountPct, cardWidth, spriteWidth, false)
+func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int) string {
+	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false)
 }
 
-func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardWidth int, spriteWidth int, inWishlist bool) string {
-	if cardWidth <= 0 {
-		cardWidth = 44
-	}
-	cardContentWidth := cardWidth - 4
-	if cardContentWidth < 10 {
-		cardContentWidth = 10
+func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool) string {
+	if cardContentWidth <= 0 {
+		cardContentWidth = 40
 	}
 
 	// Get rarity color
@@ -208,20 +203,20 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardW
 		borderCol = ColorUltra // Gold border for wishlist matches
 	}
 
+	// Render Card: Width(cardContentWidth) ensures zero trailing space padding inside the card
 	cardBox := CardStyle.
 		BorderForeground(borderCol).
-		Width(cardWidth).
+		Width(cardContentWidth).
 		Render(content.String())
 
 	// Post-Border Overlay Injection for Native Graphics
+	// Total line length of cardBox = cardContentWidth + 5 (border:2, padding:2, margin:1)
+	// Target start column = 2 (border:1, padding:1)
+	// Relative cursor jump left = (cardContentWidth + 5) - 2 = cardContentWidth + 3
 	if isNative && spr != "" {
 		cardLines := strings.Split(cardBox, "\n")
-		// In a 10-line card box:
-		// Line 0: Top Border
-		// Line 1: Header
-		// Line 2..5: Sprite rows (Line 5 is the final sprite row)
 		if len(cardLines) >= 6 {
-			cursorLeft := fmt.Sprintf("\x1b[%dD", cardWidth-2)
+			cursorLeft := fmt.Sprintf("\x1b[%dD", cardContentWidth+3)
 			cursorUp := "\x1b[3A"
 			cardLines[5] = cardLines[5] + "\x1b7" + cursorLeft + cursorUp + spr + "\x1b8"
 			cardBox = strings.Join(cardLines, "\n")
