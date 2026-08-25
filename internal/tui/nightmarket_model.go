@@ -102,7 +102,8 @@ func (m NightMarketModel) View() string {
 
 		for colIdx, c := range rowCards {
 			if c.overlay != nil {
-				colOffset := colIdx*(cardContentWidth+5) + 2
+				spriteMarginNM := (cardContentWidth - c.overlay.ContentWidth) / 2
+				colOffset := colIdx*(cardContentWidth+5) + 2 + spriteMarginNM
 				wipe := buildWipeSeq(colOffset, c.overlay.ContentWidth, c.overlay.SpriteRows)
 				payload := "\x1b7" +
 					fmt.Sprintf("\x1b[%dA", linesUp) +

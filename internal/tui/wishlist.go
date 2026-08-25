@@ -407,8 +407,12 @@ func (m WishlistModel) View() string {
 		if targetURL == "" {
 			targetURL = iconURL
 		}
+		spritePreviewRenderWidth := previewContentWidth - 4
+		if spritePreviewRenderWidth < 16 {
+			spritePreviewRenderWidth = 16
+		}
 		if targetURL != "" && previewContentWidth >= 20 {
-			previewSpr = sprite.Render(targetURL, previewContentWidth, previewTargetRows)
+			previewSpr = sprite.Render(targetURL, spritePreviewRenderWidth, previewTargetRows)
 		}
 	}
 
@@ -432,9 +436,13 @@ func (m WishlistModel) View() string {
 
 	var previewOverlay *SpriteOverlay
 	if isNativePreview && previewSpr != "" {
+		spritePreviewRenderWidth := previewContentWidth - 4
+		if spritePreviewRenderWidth < 16 {
+			spritePreviewRenderWidth = 16
+		}
 		previewOverlay = &SpriteOverlay{
 			Payload:      previewSpr,
-			ContentWidth: previewContentWidth,
+			ContentWidth: spritePreviewRenderWidth,
 			SpriteRows:   previewTargetRows,
 		}
 	}
@@ -453,10 +461,11 @@ func (m WishlistModel) View() string {
 		totalLines := len(splitLines)
 
 		// Calculate the preview box's absolute column position
-		// leftPane width + spacer width + preview card's border(1) + pad(1)
+		// leftPane width + spacer width + preview card's border(1) + pad(1) + margin
 		leftPaneWidth := lipgloss.Width(leftPane)
 		spacerWidth := 4 // "    " = 4 chars
-		colOffset := leftPaneWidth + spacerWidth + 2
+		previewSpriteMargin := (previewContentWidth - previewOverlay.ContentWidth) / 2
+		colOffset := leftPaneWidth + spacerWidth + 2 + previewSpriteMargin
 
 		// Preview box top border is at splitView line 0; sprite row 0 is at splitView line 1.
 		// linesUp from last line (totalLines - 1) to sprite row 0 (line 1) = totalLines - 2.

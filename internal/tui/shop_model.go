@@ -158,7 +158,8 @@ func (m ShopModel) View() string {
 
 		// Inject left card overlay
 		if leftCard.overlay != nil {
-			colOffset := 2 // left border(1) + left pad(1) = 2 (0-indexed)
+			spriteMargin := (cardContentWidth - leftCard.overlay.ContentWidth) / 2
+			colOffset := 2 + spriteMargin // left border(1) + left pad(1) + margin
 			wipe := buildWipeSeq(colOffset, leftCard.overlay.ContentWidth, leftCard.overlay.SpriteRows)
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
@@ -172,7 +173,8 @@ func (m ShopModel) View() string {
 		if rightCard != nil && rightCard.overlay != nil {
 			// Right card starts after left card total width (cardContentWidth + 5)
 			rightCardStart := cardContentWidth + 5 // 1 border + 1 pad + ccw + 1 pad + 1 border + 1 margin
-			colOffset := rightCardStart + 2         // + right card's left border(1) + left pad(1)
+			spriteMarginR := (cardContentWidth - rightCard.overlay.ContentWidth) / 2
+			colOffset := rightCardStart + 2 + spriteMarginR // + right card's left border(1) + left pad(1) + margin
 			wipe := buildWipeSeq(colOffset, rightCard.overlay.ContentWidth, rightCard.overlay.SpriteRows)
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
@@ -240,8 +242,12 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		renderTargetURL = skin.IconURL
 	}
 	const spriteTargetRows = 4 // fixed height for all sprite containers
+	spriteRenderWidth := cardContentWidth - 4 // 2-col margin on each side to prevent border collision
+	if spriteRenderWidth < 16 {
+		spriteRenderWidth = 16
+	}
 	if renderTargetURL != "" && cardContentWidth >= 20 {
-		spr = sprite.Render(renderTargetURL, cardContentWidth, spriteTargetRows)
+		spr = sprite.Render(renderTargetURL, spriteRenderWidth, spriteTargetRows)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}
@@ -257,7 +263,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		if spr != "" {
 			overlay = &SpriteOverlay{
 				Payload:      spr,
-				ContentWidth: cardContentWidth,
+				ContentWidth: spriteRenderWidth,
 				SpriteRows:   spriteTargetRows,
 			}
 		}
