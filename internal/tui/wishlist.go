@@ -391,7 +391,6 @@ func (m WishlistModel) View() string {
 	previewSpr := ""
 	const previewTargetRows = 6
 	previewContentWidth := previewWidth
-	cardBoxWidth := previewContentWidth + 4
 	if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
 		selected := m.filtered[m.brCursor]
 		iconURL, fullRenderURL := resolveSkinImages(selected)
@@ -419,13 +418,13 @@ func (m WishlistModel) View() string {
 
 	previewBox := CardStyle.
 		BorderForeground(ColorBorder).
-		Width(cardBoxWidth).
+		Width(previewContentWidth).
 		Render(previewContent)
 
 	if isNativePreview && previewSpr != "" {
 		pLines := strings.Split(previewBox, "\n")
-		if len(pLines) >= 7 {
-			cursorLeft := fmt.Sprintf("\x1b[%dD", cardBoxWidth-2)
+		if len(pLines) >= previewTargetRows+1 {
+			cursorLeft := fmt.Sprintf("\x1b[%dD", previewContentWidth+3)
 			cursorUp := fmt.Sprintf("\x1b[%dA", previewTargetRows-1)
 			pLines[previewTargetRows] = pLines[previewTargetRows] + "\x1b7" + cursorLeft + cursorUp + previewSpr + "\x1b8"
 			previewBox = strings.Join(pLines, "\n")
