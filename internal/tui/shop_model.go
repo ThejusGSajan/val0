@@ -88,11 +88,13 @@ func (m ShopModel) View() string {
 		cardContentWidth = 20
 	}
 
+	payloads := make(map[string]string)
+
 	// Render each skin as a card
 	var cards []string
 	for _, skin := range m.skins {
 		inWishlist := cache.IsInWishlist(skin.UUID)
-		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist))
+		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist, payloads))
 	}
 
 	// Layout: 2 × 2 grid if we have 4 skins (the standard daily shop)
@@ -116,15 +118,19 @@ func (m ShopModel) View() string {
 	}
 	sb.WriteString("  " + RenderKeyLegends(storePairs...))
 
-	return sb.String()
+	out := sb.String()
+	for placeholder, payload := range payloads {
+		out = strings.ReplaceAll(out, placeholder, payload)
+	}
+	return out
 }
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
-func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int) string {
-	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false)
+func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int, payloads map[string]string) string {
+	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false, payloads)
 }
 
-func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool) string {
+func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool, payloads map[string]string) string {
 	if cardContentWidth <= 0 {
 		cardContentWidth = 40
 	}
@@ -209,10 +215,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		Width(cardContentWidth).
 		Render(content.String())
 
-	// Post-Border Overlay Injection for Native Graphics with Local Invalidation
-	// Total line length of cardBox = cardContentWidth + 5 (border:2, padding:2, margin:1)
-	// Target start column = 2 (border:1, padding:1)
-	// Relative cursor jump left = (cardContentWidth + 5) - 2 = cardContentWidth + 3
+	// Post-Border Overlay Injection via Zero-Width OSC Placeholders
 	if isNative && spr != "" {
 		cardLines := strings.Split(cardBox, "\n")
 		if len(cardLines) >= 6 {
@@ -230,7 +233,14 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 			}
 			wipeSeq += fmt.Sprintf("\x1b[%dA", spriteTargetRows-1) // move back up
 
-			cardLines[5] = cardLines[5] + "\x1b7" + cursorLeft + cursorUp + wipeSeq + spr + "\x1b8"
+			payload := "\x1b7" + cursorLeft + cursorUp + wipeSeq + spr + "\x1b8"
+			if payloads != nil {
+				placeholder := fmt.Sprintf("\x1b]999;INJECT_SKIN_%s_%d\x07", skin.UUID, len(payloads))
+				payloads[placeholder] = payload
+				cardLines[5] = cardLines[5] + placeholder
+			} else {
+				cardLines[5] = cardLines[5] + payload
+			}
 			cardBox = strings.Join(cardLines, "\n")
 		}
 	}
