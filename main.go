@@ -7,10 +7,16 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/val-tracker/val-tracker/internal/launcher"
 	"github.com/val-tracker/val-tracker/internal/tui"
 )
 
 func main() {
+	// Relaunch in Windows Terminal if double-clicked from Explorer
+	if launcher.IsStandaloneConhost() {
+		launcher.TryRelaunchInWT(os.Args[1:])
+	}
+
 	// CLI Flag Parser
 	graphicsFlag := flag.String("graphics", "", "Force graphics protocol: sixel, kitty, iterm2, halfblock")
 	flag.Parse()
