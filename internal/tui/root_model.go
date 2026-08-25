@@ -10,6 +10,7 @@ import (
 	"github.com/val-tracker/val-tracker/internal/auth"
 	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/val-tracker/val-tracker/internal/sprite"
 )
 
 type RootState int
@@ -138,6 +139,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m RootModel) View() string {
+	var finalScreen string
 	switch m.state {
 	case StateAuthenticating:
 		content := lipgloss.NewStyle().
@@ -145,15 +147,17 @@ func (m RootModel) View() string {
 			Bold(true).
 			Render("⟳  Connecting to Riot Client...")
 		if m.width > 0 && m.height > 0 {
-			return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+			finalScreen = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+		} else {
+			finalScreen = "\n\n  " + content + "\n"
 		}
-		return "\n\n  " + content + "\n"
 
 	case StateAuthError:
-		return m.errorModel.View()
+		finalScreen = m.errorModel.View()
 
 	case StateMain:
-		return m.mainModel.View()
+		finalScreen = m.mainModel.View()
 	}
-	return ""
+
+	return sprite.InjectPayloads(finalScreen)
 }

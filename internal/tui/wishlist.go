@@ -430,8 +430,6 @@ func (m WishlistModel) View() string {
 		Width(previewContentWidth).
 		Render(previewContent)
 
-	previewPayload := ""
-	const previewPlaceholder = "\x1b]999;INJECT_PREVIEW\x07"
 	if isNativePreview && previewSpr != "" {
 		pLines := strings.Split(previewBox, "\n")
 		if len(pLines) >= previewTargetRows+1 {
@@ -449,8 +447,9 @@ func (m WishlistModel) View() string {
 			}
 			wipeSeq += fmt.Sprintf("\x1b[%dA", previewTargetRows-1) // move back up
 
-			previewPayload = "\x1b7" + cursorLeft + cursorUp + wipeSeq + previewSpr + "\x1b8"
-			pLines[previewTargetRows] = pLines[previewTargetRows] + previewPlaceholder
+			previewPayload := "\x1b7" + cursorLeft + cursorUp + wipeSeq + previewSpr + "\x1b8"
+			placeholder := sprite.RegisterPayload(previewPayload)
+			pLines[previewTargetRows] = pLines[previewTargetRows] + placeholder
 			previewBox = strings.Join(pLines, "\n")
 		}
 	}
@@ -479,9 +478,5 @@ func (m WishlistModel) View() string {
 	)
 	sb.WriteString("  " + RenderKeyLegends(wlPairs...))
 
-	out := sb.String()
-	if previewPayload != "" {
-		out = strings.ReplaceAll(out, previewPlaceholder, previewPayload)
-	}
-	return out
+	return sb.String()
 }

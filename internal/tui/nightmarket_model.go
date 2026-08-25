@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -59,15 +57,13 @@ func (m NightMarketModel) View() string {
 		cardContentWidth = 20
 	}
 
-	payloads := make(map[string]string)
-
 	var cards []string
 	for i, skin := range m.skins {
 		disc := 0
 		if i < len(m.discounts) {
 			disc = m.discounts[i]
 		}
-		cards = append(cards, renderSkinCard(skin, disc, cardContentWidth, payloads))
+		cards = append(cards, renderSkinCard(skin, disc, cardContentWidth))
 	}
 
 	// Night market has 6 items — cols x rows grid
@@ -87,11 +83,7 @@ func (m NightMarketModel) View() string {
 		[2]string{"w", "enter wishlist tab"},
 	)
 
-	out := header + "\n" + grid + "\n\n" + helpBar
-	for placeholder, payload := range payloads {
-		out = strings.ReplaceAll(out, placeholder, payload)
-	}
-	return out
+	return header + "\n" + grid + "\n\n" + helpBar
 }
 
 func (m NightMarketModel) HasData() bool {
