@@ -96,7 +96,7 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 		case "tab", "shift+tab":
 			m.focusSection = (m.focusSection + 1) % 2
 			m.flashMsg = ""
-			return m, nil
+			return m, tea.ClearScreen
 		}
 
 		if m.focusSection == 0 {
@@ -106,11 +106,13 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 				if m.wlCursor > 0 {
 					m.wlCursor--
 					m.flashMsg = ""
+					return m, nil
 				}
 			case "down", "j":
 				if m.wlCursor < len(m.entries)-1 {
 					m.wlCursor++
 					m.flashMsg = ""
+					return m, nil
 				}
 			case "x", "delete":
 				if len(m.entries) > 0 && m.wlCursor < len(m.entries) {
@@ -118,20 +120,23 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 					_ = cache.RemoveFromWishlist(removed.UUID)
 					m.Refresh()
 					m.flashMsg = fmt.Sprintf("Removed %s from wishlist.", removed.Name)
+					return m, tea.ClearScreen
 				}
 			}
 		} else {
-			// Browse section focused
+			// Browse section focused - Invalidate screen on selection change to eliminate graphics ghosting
 			switch msg.Type {
 			case tea.KeyUp:
 				if m.brCursor > 0 {
 					m.brCursor--
 					m.flashMsg = ""
+					return m, tea.ClearScreen
 				}
 			case tea.KeyDown:
 				if m.brCursor < len(m.filtered)-1 {
 					m.brCursor++
 					m.flashMsg = ""
+					return m, tea.ClearScreen
 				}
 			case tea.KeyEnter:
 				if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
@@ -169,21 +174,25 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 					_ = cache.AddToWishlist(entry)
 					m.Refresh()
 					m.flashMsg = fmt.Sprintf("Added %s to wishlist!", selected.DisplayName)
+					return m, tea.ClearScreen
 				}
 			case tea.KeyBackspace:
 				if len(m.searchInput) > 0 {
 					m.searchInput = m.searchInput[:len(m.searchInput)-1]
 					m.filterSkins()
 					m.flashMsg = ""
+					return m, tea.ClearScreen
 				}
 			case tea.KeySpace:
 				m.searchInput += " "
 				m.filterSkins()
 				m.flashMsg = ""
+				return m, tea.ClearScreen
 			case tea.KeyRunes:
 				m.searchInput += string(msg.Runes)
 				m.filterSkins()
 				m.flashMsg = ""
+				return m, tea.ClearScreen
 			}
 		}
 	}
