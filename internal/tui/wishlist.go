@@ -447,9 +447,15 @@ func (m WishlistModel) View() string {
 		}
 	}
 
+	leftPaneLines := strings.Split(leftPane, "\n")
+	maxHeight := len(leftPaneLines)
+	if maxHeight < 8 {
+		maxHeight = 8
+	}
+
 	spacerLine := lipgloss.NewStyle().Background(ColorBg).Render("    ")
 	var spacerLines []string
-	for i := 0; i < 8; i++ {
+	for i := 0; i < maxHeight; i++ {
 		spacerLines = append(spacerLines, spacerLine)
 	}
 	middleSpacer := strings.Join(spacerLines, "\n")
@@ -464,6 +470,15 @@ func (m WishlistModel) View() string {
 		// leftPane width + spacer width + preview card's border(1) + pad(1) + margin
 		leftPaneWidth := lipgloss.Width(leftPane)
 		spacerWidth := 4 // "    " = 4 chars
+
+		// Wipe lines below the preview box with background color to eliminate residual black column
+		bgWipe := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewContentWidth+2))
+		for i := 8; i < len(splitLines); i++ {
+			if lipgloss.Width(splitLines[i]) <= leftPaneWidth+spacerWidth {
+				splitLines[i] += bgWipe
+			}
+		}
+
 		previewSpriteMargin := (previewContentWidth - previewOverlay.ContentWidth) / 2
 		colOffset := leftPaneWidth + spacerWidth + 2 + previewSpriteMargin
 
@@ -472,10 +487,20 @@ func (m WishlistModel) View() string {
 		linesUp := totalLines - 2
 
 		wipe := buildWipeSeq(colOffset, previewOverlay.ContentWidth, previewOverlay.SpriteRows)
+
+		belowSpriteWipe := ""
+		extraWipeRows := 4 // Wipe 4 extra rows below the sprite to clear any artifacts
+		bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewOverlay.ContentWidth))
+		for i := 0; i < extraWipeRows; i++ {
+			belowSpriteWipe += fmt.Sprintf("\x1b[1B\x1b[%dG", colOffset+1) + bgSpaces
+		}
+
 		payload := "\x1b7" +
 			fmt.Sprintf("\x1b[%dA", linesUp) +
 			fmt.Sprintf("\x1b[%dG", colOffset+1) +
-			wipe + previewOverlay.Payload + "\x1b8"
+			wipe + previewOverlay.Payload +
+			belowSpriteWipe +
+			"\x1b8"
 		placeholder := sprite.RegisterPayload(payload)
 		splitLines[totalLines-1] += placeholder
 		splitView = strings.Join(splitLines, "\n")
