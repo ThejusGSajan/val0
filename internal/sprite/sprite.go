@@ -44,8 +44,8 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 	var result string
 	if proto != ProtocolHalfBlock {
 		// 1B & 2A: Fixed Canvas Normalization
-		const cellW = 8
-		const cellH = 16
+		const cellW = 10
+		const cellH = 20
 		targetPixelWidth := widthCols * cellW
 		targetPixelHeight := targetRows * cellH
 
