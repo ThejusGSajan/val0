@@ -3,6 +3,7 @@ package sprite
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
@@ -15,9 +16,36 @@ import (
 )
 
 var (
-	spriteMap   = make(map[string]string)
-	spriteMutex sync.Mutex
+	spriteMap    = make(map[string]string)
+	spriteMutex  sync.Mutex
+	payloadMap   = make(map[string]string)
+	payloadMutex sync.Mutex
+	payloadID    int
 )
+
+// RegisterPayload stores the ANSI/Sixel graphics payload and returns a zero-width OSC placeholder.
+func RegisterPayload(payload string) string {
+	payloadMutex.Lock()
+	defer payloadMutex.Unlock()
+	payloadID++
+	placeholder := fmt.Sprintf("\x1b]999;INJECT_%d\x07", payloadID)
+	payloadMap[placeholder] = payload
+	return placeholder
+}
+
+// InjectPayloads replaces all OSC placeholders with their stored payloads and flushes the registry.
+func InjectPayloads(out string) string {
+	payloadMutex.Lock()
+	defer payloadMutex.Unlock()
+	if len(payloadMap) == 0 {
+		return out
+	}
+	for placeholder, payload := range payloadMap {
+		out = strings.ReplaceAll(out, placeholder, payload)
+	}
+	payloadMap = make(map[string]string)
+	return out
+}
 
 // Render downloads the image at iconURL and renders it using the best
 // available terminal graphics protocol (Sixel, Kitty, iTerm2, or ANSI half-blocks).
@@ -52,13 +80,15 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
 
-		// Create Transparent Background Canvas (A=0 everywhere)
+		// Create Solid #0F1117 Background Canvas (Pre-composited to prevent terminal black-bar fallback)
 		canvas := image.NewRGBA(image.Rect(0, 0, targetPixelWidth, targetPixelHeight))
+		bgColor := color.RGBA{R: 15, G: 17, B: 23, A: 255}
+		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: bgColor}, image.Point{}, draw.Src)
 
-		// Center the resized weapon onto the canvas
+		// Center the resized weapon onto the canvas with alpha blending
 		offsetX := (targetPixelWidth - resized.Bounds().Dx()) / 2
 		offsetY := (targetPixelHeight - resized.Bounds().Dy()) / 2
-		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Src)
+		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Over)
 
 		// Encode the fully normalized canvas
 		switch proto {

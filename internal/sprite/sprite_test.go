@@ -1,6 +1,7 @@
 package sprite
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"strings"
@@ -82,5 +83,29 @@ func TestRenderITerm2Encoding(t *testing.T) {
 	}
 	if !strings.Contains(itermStr, "\x1b]1337;File=inline=1;width=40:") {
 		t.Errorf("expected iTerm2 escape sequence, got %q", itermStr)
+	}
+}
+
+func TestPayloadRegistry(t *testing.T) {
+	payload := "\x1b7\x1b[30D\x1b[3A<SIXEL_BYTES>\x1b8"
+	placeholder := RegisterPayload(payload)
+	if !strings.HasPrefix(placeholder, "\x1b]999;INJECT_") {
+		t.Fatalf("unexpected placeholder prefix: %q", placeholder)
+	}
+
+	screen := fmt.Sprintf("Line1\nLine2%s\nLine3", placeholder)
+	injected := InjectPayloads(screen)
+
+	if strings.Contains(injected, placeholder) {
+		t.Errorf("expected placeholder to be replaced")
+	}
+	if !strings.Contains(injected, payload) {
+		t.Errorf("expected payload to be present in injected output")
+	}
+
+	// Secondary injection should have flushed registry
+	second := InjectPayloads(screen)
+	if second != screen {
+		t.Errorf("expected empty registry on subsequent inject, got %q", second)
 	}
 }
