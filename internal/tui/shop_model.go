@@ -12,6 +12,32 @@ import (
 	"github.com/val-tracker/val-tracker/internal/sprite"
 )
 
+// SpriteOverlay holds a native graphics payload and metadata for grid-level injection.
+type SpriteOverlay struct {
+	Payload      string // The raw Sixel/Kitty/iTerm2 payload (without cursor jumps)
+	ContentWidth int    // Width of the sprite content area (columns)
+	SpriteRows   int    // Number of terminal rows the sprite occupies
+}
+
+// buildWipeSeq creates an in-band cell wipe sequence with absolute column positioning.
+func buildWipeSeq(colOffset, contentWidth, spriteRows int) string {
+	bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", contentWidth))
+	var sb strings.Builder
+	for i := 0; i < spriteRows; i++ {
+		sb.WriteString(fmt.Sprintf("\x1b[%dG", colOffset+1)) // Absolute column (1-indexed)
+		sb.WriteString(bgSpaces)
+		if i < spriteRows-1 {
+			sb.WriteString("\x1b[1B") // Move down 1 line
+		}
+	}
+	// Move back up to sprite row 0
+	if spriteRows > 1 {
+		sb.WriteString(fmt.Sprintf("\x1b[%dA", spriteRows-1))
+		sb.WriteString(fmt.Sprintf("\x1b[%dG", colOffset+1)) // Reset column after final move-up
+	}
+	return sb.String()
+}
+
 type ShopModel struct {
 	skins          []models.ResolvedSkin
 	timeRemaining  int // seconds
@@ -88,22 +114,76 @@ func (m ShopModel) View() string {
 		cardContentWidth = 20
 	}
 
-	// Render each skin as a card
-	var cards []string
-	for _, skin := range m.skins {
+	type cardWithOverlay struct {
+		rendered string
+		overlay  *SpriteOverlay
+		colIndex int
+	}
+
+	var cardsWithOverlay []cardWithOverlay
+	for i, skin := range m.skins {
 		inWishlist := cache.IsInWishlist(skin.UUID)
-		cards = append(cards, renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist))
+		rendered, overlay := renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist)
+		cardsWithOverlay = append(cardsWithOverlay, cardWithOverlay{
+			rendered: rendered,
+			overlay:  overlay,
+			colIndex: i % 2,
+		})
 	}
 
 	// Layout: 2 × 2 grid if we have 4 skins (the standard daily shop)
 	var rows []string
-	for i := 0; i < len(cards); i += 2 {
-		if i+1 < len(cards) {
-			row := lipgloss.JoinHorizontal(lipgloss.Top, cards[i], cards[i+1])
-			rows = append(rows, row)
-		} else {
-			rows = append(rows, cards[i])
+	for i := 0; i < len(cardsWithOverlay); i += 2 {
+		leftCard := cardsWithOverlay[i]
+		var rightCard *cardWithOverlay
+		if i+1 < len(cardsWithOverlay) {
+			rc := cardsWithOverlay[i+1]
+			rightCard = &rc
 		}
+
+		var gridRow string
+		if rightCard != nil {
+			gridRow = lipgloss.JoinHorizontal(lipgloss.Top, leftCard.rendered, rightCard.rendered)
+		} else {
+			gridRow = leftCard.rendered
+		}
+
+		gridRowLines := strings.Split(gridRow, "\n")
+		totalLines := len(gridRowLines)
+
+		// The card structure: top border (1) + wishlist header (1) + sprite rows (4) + name (1) + rarity (1) + price (1) + bottom border (1) = 10 lines
+		// Sprite row 0 starts at line index 2.
+		// linesUp from last line (totalLines - 1) to sprite row 0 (line 2) = totalLines - 1 - 2 = totalLines - 3
+		linesUp := totalLines - 3
+
+		// Inject left card overlay
+		if leftCard.overlay != nil {
+			colOffset := 2 // left border(1) + left pad(1) = 2 (0-indexed)
+			wipe := buildWipeSeq(colOffset, leftCard.overlay.ContentWidth, leftCard.overlay.SpriteRows)
+			payload := "\x1b7" +
+				fmt.Sprintf("\x1b[%dA", linesUp) +
+				fmt.Sprintf("\x1b[%dG", colOffset+1) +
+				wipe + leftCard.overlay.Payload + "\x1b8"
+			placeholder := sprite.RegisterPayload(payload)
+			gridRowLines[totalLines-1] += placeholder
+		}
+
+		// Inject right card overlay
+		if rightCard != nil && rightCard.overlay != nil {
+			// Right card starts after left card total width (cardContentWidth + 5)
+			rightCardStart := cardContentWidth + 5 // 1 border + 1 pad + ccw + 1 pad + 1 border + 1 margin
+			colOffset := rightCardStart + 2         // + right card's left border(1) + left pad(1)
+			wipe := buildWipeSeq(colOffset, rightCard.overlay.ContentWidth, rightCard.overlay.SpriteRows)
+			payload := "\x1b7" +
+				fmt.Sprintf("\x1b[%dA", linesUp) +
+				fmt.Sprintf("\x1b[%dG", colOffset+1) +
+				wipe + rightCard.overlay.Payload + "\x1b8"
+			placeholder := sprite.RegisterPayload(payload)
+			gridRowLines[totalLines-1] += placeholder
+		}
+
+		gridRow = strings.Join(gridRowLines, "\n")
+		rows = append(rows, gridRow)
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, rows...)
@@ -120,11 +200,11 @@ func (m ShopModel) View() string {
 }
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
-func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int) string {
+func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int) (string, *SpriteOverlay) {
 	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false)
 }
 
-func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool) string {
+func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool) (string, *SpriteOverlay) {
 	if cardContentWidth <= 0 {
 		cardContentWidth = 40
 	}
@@ -166,12 +246,20 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		spr = skin.Sprite
 	}
 
+	var overlay *SpriteOverlay
 	isNative := strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337")
 	if isNative {
 		// Post-Border Overlay: Output 4 clean background-styled lines to Lipgloss
 		emptySpriteLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth))
 		for i := 0; i < spriteTargetRows; i++ {
 			content.WriteString(emptySpriteLine + "\n")
+		}
+		if spr != "" {
+			overlay = &SpriteOverlay{
+				Payload:      spr,
+				ContentWidth: cardContentWidth,
+				SpriteRows:   spriteTargetRows,
+			}
 		}
 	} else {
 		// Half-block fallback
@@ -209,32 +297,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		Width(cardContentWidth).
 		Render(content.String())
 
-	// Post-Border Overlay Injection via Global Payload Registry
-	if isNative && spr != "" {
-		cardLines := strings.Split(cardBox, "\n")
-		if len(cardLines) >= 6 {
-			cursorLeft := fmt.Sprintf("\x1b[%dD", cardContentWidth+3)
-			cursorUp := "\x1b[3A"
-
-			// Local Invalidation Engine: wipe sprite cell area with card background
-			bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", cardContentWidth))
-			wipeSeq := ""
-			for i := 0; i < spriteTargetRows; i++ {
-				wipeSeq += bgSpaces + fmt.Sprintf("\x1b[%dD", cardContentWidth)
-				if i < spriteTargetRows-1 {
-					wipeSeq += "\x1b[1B" // move down 1 line
-				}
-			}
-			wipeSeq += fmt.Sprintf("\x1b[%dA", spriteTargetRows-1) // move back up
-
-			payload := "\x1b7" + cursorLeft + cursorUp + wipeSeq + spr + "\x1b8"
-			placeholder := sprite.RegisterPayload(payload)
-			cardLines[5] = cardLines[5] + placeholder
-			cardBox = strings.Join(cardLines, "\n")
-		}
-	}
-
-	return cardBox
+	return cardBox, overlay
 }
 
 // padSpriteToHeight ensures the sprite string occupies exactly `targetRows` lines.
@@ -252,33 +315,7 @@ func padSpriteToHeight(spr string, targetRows int, width int, bgHex string) stri
 		return strings.Join(lines, "\n")
 	}
 
-	// [FIXED]: Sixel Post-Draw Architecture
-	// Protect Native Graphics from being overwritten by Lip Gloss background spaces.
-	if strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337") {
-		lines := make([]string, targetRows)
-
-		// 1. Give Lip Gloss pure spaces for the first (targetRows - 1) lines.
-		// The terminal will print these spaces and paint the background color normally.
-		for i := 0; i < targetRows-1; i++ {
-			lines[i] = emptyLine
-		}
-
-		// 2. On the final line, we print the Lip Gloss spaces, and then physically move
-		// the terminal cursor backward over the newly painted spaces, up to the top of
-		// the card, and THEN execute the Sixel payload to draw on top of the spaces.
-
-		// \x1b[%dD moves cursor LEFT by `width` columns.
-		cursorLeft := fmt.Sprintf("\x1b[%dD", width)
-
-		// \x1b[%dA moves cursor UP by (targetRows - 1) lines.
-		cursorUp := fmt.Sprintf("\x1b[%dA", targetRows-1)
-
-		// DEC Save cursor (\x1b7), jump up-left, emit payload, DEC Restore cursor (\x1b8)
-		lines[targetRows-1] = emptyLine + "\x1b7" + cursorLeft + cursorUp + spr + "\x1b8"
-
-		return strings.Join(lines, "\n")
-	}
-
+	// Half-block only (native graphics are handled at grid level)
 	lines := strings.Split(strings.TrimRight(spr, "\n"), "\n")
 	if len(lines) > targetRows {
 		lines = lines[:targetRows]

@@ -430,27 +430,12 @@ func (m WishlistModel) View() string {
 		Width(previewContentWidth).
 		Render(previewContent)
 
+	var previewOverlay *SpriteOverlay
 	if isNativePreview && previewSpr != "" {
-		pLines := strings.Split(previewBox, "\n")
-		if len(pLines) >= previewTargetRows+1 {
-			cursorLeft := fmt.Sprintf("\x1b[%dD", previewContentWidth+3)
-			cursorUp := fmt.Sprintf("\x1b[%dA", previewTargetRows-1)
-
-			// Local Invalidation Engine: wipe preview cell area with card background
-			bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewContentWidth))
-			wipeSeq := ""
-			for i := 0; i < previewTargetRows; i++ {
-				wipeSeq += bgSpaces + fmt.Sprintf("\x1b[%dD", previewContentWidth)
-				if i < previewTargetRows-1 {
-					wipeSeq += "\x1b[1B" // move down 1 line
-				}
-			}
-			wipeSeq += fmt.Sprintf("\x1b[%dA", previewTargetRows-1) // move back up
-
-			previewPayload := "\x1b7" + cursorLeft + cursorUp + wipeSeq + previewSpr + "\x1b8"
-			placeholder := sprite.RegisterPayload(previewPayload)
-			pLines[previewTargetRows] = pLines[previewTargetRows] + placeholder
-			previewBox = strings.Join(pLines, "\n")
+		previewOverlay = &SpriteOverlay{
+			Payload:      previewSpr,
+			ContentWidth: previewContentWidth,
+			SpriteRows:   previewTargetRows,
 		}
 	}
 
@@ -462,6 +447,31 @@ func (m WishlistModel) View() string {
 	middleSpacer := strings.Join(spacerLines, "\n")
 
 	splitView := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, middleSpacer, previewBox)
+
+	if previewOverlay != nil {
+		splitLines := strings.Split(splitView, "\n")
+		totalLines := len(splitLines)
+
+		// Calculate the preview box's absolute column position
+		// leftPane width + spacer width + preview card's border(1) + pad(1)
+		leftPaneWidth := lipgloss.Width(leftPane)
+		spacerWidth := 4 // "    " = 4 chars
+		colOffset := leftPaneWidth + spacerWidth + 2
+
+		// Preview box top border is at splitView line 0; sprite row 0 is at splitView line 1.
+		// linesUp from last line (totalLines - 1) to sprite row 0 (line 1) = totalLines - 2.
+		linesUp := totalLines - 2
+
+		wipe := buildWipeSeq(colOffset, previewOverlay.ContentWidth, previewOverlay.SpriteRows)
+		payload := "\x1b7" +
+			fmt.Sprintf("\x1b[%dA", linesUp) +
+			fmt.Sprintf("\x1b[%dG", colOffset+1) +
+			wipe + previewOverlay.Payload + "\x1b8"
+		placeholder := sprite.RegisterPayload(payload)
+		splitLines[totalLines-1] += placeholder
+		splitView = strings.Join(splitLines, "\n")
+	}
+
 	sb.WriteString(splitView + "\n\n")
 
 	var wlPairs [][2]string
