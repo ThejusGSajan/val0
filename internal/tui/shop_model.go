@@ -209,7 +209,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		Width(cardContentWidth).
 		Render(content.String())
 
-	// Post-Border Overlay Injection for Native Graphics
+	// Post-Border Overlay Injection for Native Graphics with Local Invalidation
 	// Total line length of cardBox = cardContentWidth + 5 (border:2, padding:2, margin:1)
 	// Target start column = 2 (border:1, padding:1)
 	// Relative cursor jump left = (cardContentWidth + 5) - 2 = cardContentWidth + 3
@@ -218,7 +218,19 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		if len(cardLines) >= 6 {
 			cursorLeft := fmt.Sprintf("\x1b[%dD", cardContentWidth+3)
 			cursorUp := "\x1b[3A"
-			cardLines[5] = cardLines[5] + "\x1b7" + cursorLeft + cursorUp + spr + "\x1b8"
+
+			// Local Invalidation Engine: wipe sprite cell area with card background
+			bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", cardContentWidth))
+			wipeSeq := ""
+			for i := 0; i < spriteTargetRows; i++ {
+				wipeSeq += bgSpaces + fmt.Sprintf("\x1b[%dD", cardContentWidth)
+				if i < spriteTargetRows-1 {
+					wipeSeq += "\x1b[1B" // move down 1 line
+				}
+			}
+			wipeSeq += fmt.Sprintf("\x1b[%dA", spriteTargetRows-1) // move back up
+
+			cardLines[5] = cardLines[5] + "\x1b7" + cursorLeft + cursorUp + wipeSeq + spr + "\x1b8"
 			cardBox = strings.Join(cardLines, "\n")
 		}
 	}

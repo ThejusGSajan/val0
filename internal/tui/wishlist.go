@@ -435,7 +435,19 @@ func (m WishlistModel) View() string {
 		if len(pLines) >= previewTargetRows+1 {
 			cursorLeft := fmt.Sprintf("\x1b[%dD", previewContentWidth+3)
 			cursorUp := fmt.Sprintf("\x1b[%dA", previewTargetRows-1)
-			pLines[previewTargetRows] = pLines[previewTargetRows] + "\x1b7" + cursorLeft + cursorUp + previewSpr + "\x1b8"
+
+			// Local Invalidation Engine: wipe preview cell area with card background
+			bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewContentWidth))
+			wipeSeq := ""
+			for i := 0; i < previewTargetRows; i++ {
+				wipeSeq += bgSpaces + fmt.Sprintf("\x1b[%dD", previewContentWidth)
+				if i < previewTargetRows-1 {
+					wipeSeq += "\x1b[1B" // move down 1 line
+				}
+			}
+			wipeSeq += fmt.Sprintf("\x1b[%dA", previewTargetRows-1) // move back up
+
+			pLines[previewTargetRows] = pLines[previewTargetRows] + "\x1b7" + cursorLeft + cursorUp + wipeSeq + previewSpr + "\x1b8"
 			previewBox = strings.Join(pLines, "\n")
 		}
 	}
