@@ -151,9 +151,9 @@ func (m ShopModel) View() string {
 		gridRowLines := strings.Split(gridRow, "\n")
 		totalLines := len(gridRowLines)
 
-		// The card structure: top border (1) + wishlist header (1) + sprite rows (4) + name (1) + rarity (1) + price (1) + bottom border (1) = 10 lines
+		// The card structure: top border (1) + wishlist header (1) + sprite rows (4) + spacer (1) + name (1) + rarity (1) + price (1) + bottom border (1) = 11 lines
 		// Sprite row 0 starts at line index 2.
-		// linesUp from last line (totalLines - 1) to sprite row 0 (line 2) = totalLines - 1 - 2 = totalLines - 3
+		// linesUp from last line (totalLines - 1) to sprite row 0 (line 2) = totalLines - 3
 		linesUp := totalLines - 3
 
 		// Inject left card overlay
@@ -273,11 +273,16 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		content.WriteString(spr + "\n")
 	}
 
-	// Line 5: Skin name
+	// Spacer line: absorbs any native graphics (Sixel) vertical overflow
+	// that might bleed past the sprite area. Prevents sprite from overwriting the name line.
+	content.WriteString(lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth)))
+	content.WriteString("\n")
+
+	// Line 6: Skin name
 	content.WriteString(nameStyle.Render(truncate(skin.DisplayName, cardContentWidth)))
 	content.WriteString("\n")
 
-	// Line 6: Rarity tag
+	// Line 7: Rarity tag
 	if skin.Rarity != "" {
 		content.WriteString(rarityTagStyle.Render(truncate("● "+skin.Rarity+" Edition", cardContentWidth)))
 	} else {
