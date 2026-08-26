@@ -472,11 +472,9 @@ func (m WishlistModel) View() string {
 		spacerWidth := 4 // "    " = 4 chars
 
 		// Wipe lines below the preview box with background color to eliminate residual black column
-		bgWipe := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewContentWidth+2))
+		bgWipe := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewContentWidth+4))
 		for i := 8; i < len(splitLines); i++ {
-			if lipgloss.Width(splitLines[i]) <= leftPaneWidth+spacerWidth {
-				splitLines[i] += bgWipe
-			}
+			splitLines[i] += bgWipe
 		}
 
 		previewSpriteMargin := (previewContentWidth - previewOverlay.ContentWidth) / 2
