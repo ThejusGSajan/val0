@@ -106,13 +106,13 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 				if m.wlCursor > 0 {
 					m.wlCursor--
 					m.flashMsg = ""
-					return m, nil
+					return m, tea.ClearScreen
 				}
 			case "down", "j":
 				if m.wlCursor < len(m.entries)-1 {
 					m.wlCursor++
 					m.flashMsg = ""
-					return m, nil
+					return m, tea.ClearScreen
 				}
 			case "x", "delete":
 				if len(m.entries) > 0 && m.wlCursor < len(m.entries) {
@@ -124,19 +124,19 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 				}
 			}
 		} else {
-			// Browse section focused - Smooth navigation with local invalidation (NO full-screen clear)
+			// Browse section focused
 			switch msg.Type {
 			case tea.KeyUp:
 				if m.brCursor > 0 {
 					m.brCursor--
 					m.flashMsg = ""
-					return m, nil
+					return m, tea.ClearScreen
 				}
 			case tea.KeyDown:
 				if m.brCursor < len(m.filtered)-1 {
 					m.brCursor++
 					m.flashMsg = ""
-					return m, nil
+					return m, tea.ClearScreen
 				}
 			case tea.KeyEnter:
 				if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
@@ -181,18 +181,18 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 					m.searchInput = m.searchInput[:len(m.searchInput)-1]
 					m.filterSkins()
 					m.flashMsg = ""
-					return m, nil
+					return m, tea.ClearScreen
 				}
 			case tea.KeySpace:
 				m.searchInput += " "
 				m.filterSkins()
 				m.flashMsg = ""
-				return m, nil
+				return m, tea.ClearScreen
 			case tea.KeyRunes:
 				m.searchInput += string(msg.Runes)
 				m.filterSkins()
 				m.flashMsg = ""
-				return m, nil
+				return m, tea.ClearScreen
 			}
 		}
 	}
@@ -486,13 +486,16 @@ func (m WishlistModel) View() string {
 		// linesUp from last line (totalLines - 1) to sprite row 0 (line 1) = totalLines - 2.
 		linesUp := totalLines - 2
 
-		wipe := buildWipeSeq(colOffset, previewOverlay.ContentWidth, previewOverlay.SpriteRows)
+		// Use full preview content width for wipe (not reduced sprite width)
+		// to ensure the entire preview column is cleared of old Sixel artifacts
+		fullWipeColOffset := leftPaneWidth + spacerWidth + 2
+		wipe := buildWipeSeq(fullWipeColOffset, previewContentWidth, previewOverlay.SpriteRows)
 
 		belowSpriteWipe := ""
-		extraWipeRows := 4 // Wipe 4 extra rows below the sprite to clear any artifacts
-		bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewOverlay.ContentWidth))
+		extraWipeRows := 6 // Wipe 6 extra rows below the sprite for thorough Sixel cleanup
+		bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewContentWidth))
 		for i := 0; i < extraWipeRows; i++ {
-			belowSpriteWipe += fmt.Sprintf("\x1b[1B\x1b[%dG", colOffset+1) + bgSpaces
+			belowSpriteWipe += fmt.Sprintf("\x1b[1B\x1b[%dG", fullWipeColOffset+1) + bgSpaces
 		}
 
 		payload := "\x1b7" +
