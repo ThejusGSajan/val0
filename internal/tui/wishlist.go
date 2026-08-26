@@ -106,13 +106,13 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 				if m.wlCursor > 0 {
 					m.wlCursor--
 					m.flashMsg = ""
-					return m, tea.ClearScreen
+					return m, nil
 				}
 			case "down", "j":
 				if m.wlCursor < len(m.entries)-1 {
 					m.wlCursor++
 					m.flashMsg = ""
-					return m, tea.ClearScreen
+					return m, nil
 				}
 			case "x", "delete":
 				if len(m.entries) > 0 && m.wlCursor < len(m.entries) {
@@ -124,19 +124,20 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 				}
 			}
 		} else {
-			// Browse section focused
+			// Browse section focused - no full-screen clear needed; the buildWipeSeq
+			// and belowSpriteWipe in View() clear old Sixel data before rendering new preview
 			switch msg.Type {
 			case tea.KeyUp:
 				if m.brCursor > 0 {
 					m.brCursor--
 					m.flashMsg = ""
-					return m, tea.ClearScreen
+					return m, nil
 				}
 			case tea.KeyDown:
 				if m.brCursor < len(m.filtered)-1 {
 					m.brCursor++
 					m.flashMsg = ""
-					return m, tea.ClearScreen
+					return m, nil
 				}
 			case tea.KeyEnter:
 				if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
@@ -181,18 +182,18 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 					m.searchInput = m.searchInput[:len(m.searchInput)-1]
 					m.filterSkins()
 					m.flashMsg = ""
-					return m, tea.ClearScreen
+					return m, nil
 				}
 			case tea.KeySpace:
 				m.searchInput += " "
 				m.filterSkins()
 				m.flashMsg = ""
-				return m, tea.ClearScreen
+				return m, nil
 			case tea.KeyRunes:
 				m.searchInput += string(msg.Runes)
 				m.filterSkins()
 				m.flashMsg = ""
-				return m, tea.ClearScreen
+				return m, nil
 			}
 		}
 	}
