@@ -71,13 +71,18 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 
 	var result string
 	if proto != ProtocolHalfBlock {
-		// Conservative cell dimensions to prevent overflow on all terminals.
-		// Using smaller values ensures the canvas never exceeds the allotted
-		// cell area, even if the terminal's actual cells are smaller than assumed.
-		const cellW = 8
-		const cellH = 16
-		targetPixelWidth := widthCols * cellW
-		targetPixelHeight := targetRows * cellH
+		// Canvas pixel dimensions for native graphics protocols (Sixel, Kitty, iTerm2).
+		//
+		// Width: 8px per column is a safe lower bound for cell width across terminals.
+		// Height: 8px per row, rounded DOWN to the nearest multiple of 6 (Sixel band height).
+		// This ensures the Sixel output never exceeds targetRows on terminals with
+		// cell heights as small as 8px. On terminals with larger cells (e.g., 20px),
+		// the image will be proportionally smaller but correctly contained.
+		targetPixelWidth := widthCols * 8
+		targetPixelHeight := (targetRows * 8 / 6) * 6
+		if targetPixelHeight < 6 {
+			targetPixelHeight = 6
+		}
 
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
