@@ -71,14 +71,13 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 
 	var result string
 	if proto != ProtocolHalfBlock {
-		// 1B & 2A: Fixed Canvas Normalization
-		const cellW = 10
-		const cellH = 20
+		// Conservative cell dimensions to prevent overflow on all terminals.
+		// Using smaller values ensures the canvas never exceeds the allotted
+		// cell area, even if the terminal's actual cells are smaller than assumed.
+		const cellW = 8
+		const cellH = 16
 		targetPixelWidth := widthCols * cellW
-		targetPixelHeight := targetRows*cellH - 4 // Clip 4px to prevent row overflow
-		if targetPixelHeight < cellH {
-			targetPixelHeight = cellH
-		}
+		targetPixelHeight := targetRows * cellH
 
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
