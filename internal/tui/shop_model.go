@@ -17,6 +17,7 @@ type SpriteOverlay struct {
 	Payload      string // The raw Sixel/Kitty/iTerm2 payload (without cursor jumps)
 	ContentWidth int    // Width of the sprite content area (columns)
 	SpriteRows   int    // Number of terminal rows the sprite occupies
+	OffsetX      int    // Horizontal shift in terminal columns (e.g. -2 for right column)
 }
 
 // buildWipeSeq creates an in-band cell wipe sequence with absolute column positioning.
@@ -123,7 +124,11 @@ func (m ShopModel) View() string {
 	var cardsWithOverlay []cardWithOverlay
 	for i, skin := range m.skins {
 		inWishlist := cache.IsInWishlist(skin.UUID)
-		rendered, overlay := renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist)
+		offsetX := 0
+		if i%2 == 1 {
+			offsetX = -2
+		}
+		rendered, overlay := renderSkinCardWithWishlist(skin, -1, cardContentWidth, inWishlist, offsetX)
 		cardsWithOverlay = append(cardsWithOverlay, cardWithOverlay{
 			rendered: rendered,
 			overlay:  overlay,
@@ -159,7 +164,7 @@ func (m ShopModel) View() string {
 		// Inject left card overlay
 		if leftCard.overlay != nil {
 			spriteMargin := (cardContentWidth - leftCard.overlay.ContentWidth) / 2
-			colOffset := 2 + spriteMargin // left border(1) + left pad(1) + margin
+			colOffset := 2 + spriteMargin + leftCard.overlay.OffsetX // left border(1) + left pad(1) + margin + offset
 			wipe := buildWipeSeq(colOffset, leftCard.overlay.ContentWidth, leftCard.overlay.SpriteRows)
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
@@ -174,7 +179,7 @@ func (m ShopModel) View() string {
 			// Right card starts after left card total width (cardContentWidth + 5)
 			rightCardStart := cardContentWidth + 5 // 1 border + 1 pad + ccw + 1 pad + 1 border + 1 margin
 			spriteMarginR := (cardContentWidth - rightCard.overlay.ContentWidth) / 2
-			colOffset := rightCardStart + 2 + spriteMarginR // + right card's left border(1) + left pad(1) + margin
+			colOffset := rightCardStart + 2 + spriteMarginR + rightCard.overlay.OffsetX // + right card's left border(1) + left pad(1) + margin + offset
 			wipe := buildWipeSeq(colOffset, rightCard.overlay.ContentWidth, rightCard.overlay.SpriteRows)
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
@@ -203,10 +208,10 @@ func (m ShopModel) View() string {
 
 // renderSkinCard creates a single skin display card with sprite + name + price.
 func renderSkinCard(skin models.ResolvedSkin, discountPct int, cardContentWidth int) (string, *SpriteOverlay) {
-	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false)
+	return renderSkinCardWithWishlist(skin, discountPct, cardContentWidth, false, 0)
 }
 
-func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool) (string, *SpriteOverlay) {
+func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardContentWidth int, inWishlist bool, offsetX int) (string, *SpriteOverlay) {
 	if cardContentWidth <= 0 {
 		cardContentWidth = 40
 	}
@@ -242,12 +247,12 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		renderTargetURL = skin.IconURL
 	}
 	const spriteTargetRows = 5 // fixed height for all sprite containers
-	spriteRenderWidth := cardContentWidth
+	spriteRenderWidth := cardContentWidth - 4
 	if spriteRenderWidth < 16 {
 		spriteRenderWidth = 16
 	}
 	if renderTargetURL != "" && cardContentWidth >= 20 {
-		spr = sprite.RenderTrimmed(renderTargetURL, spriteRenderWidth, spriteTargetRows)
+		spr = sprite.Render(renderTargetURL, spriteRenderWidth, spriteTargetRows)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}
@@ -265,11 +270,12 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 				Payload:      spr,
 				ContentWidth: spriteRenderWidth,
 				SpriteRows:   spriteTargetRows,
+				OffsetX:      offsetX,
 			}
 		}
 	} else {
 		// Half-block fallback
-		spr = padSpriteToHeight(spr, spriteTargetRows, cardContentWidth, string(ColorBg))
+		spr = padSpriteToHeightWithOffset(spr, spriteTargetRows, cardContentWidth, string(ColorBg), spriteRenderWidth, offsetX)
 		content.WriteString(spr + "\n")
 	}
 
@@ -334,6 +340,60 @@ func padSpriteToHeight(spr string, targetRows int, width int, bgHex string) stri
 		result = append(result, emptyLine)
 	}
 	result = append(result, lines...)
+	for i := 0; i < bottomPad; i++ {
+		result = append(result, emptyLine)
+	}
+	return strings.Join(result, "\n")
+}
+
+// padSpriteToHeightWithOffset pads sprite rows vertically and horizontally with a column offset.
+// Total line width is guaranteed to equal width, preserving Lipgloss border invariants.
+func padSpriteToHeightWithOffset(spr string, targetRows int, width int, bgHex string, spriteWidth int, offsetX int) string {
+	bgStyle := lipgloss.NewStyle().Background(lipgloss.Color(bgHex))
+	emptyLine := bgStyle.Render(strings.Repeat(" ", width))
+
+	if spr == "" {
+		lines := make([]string, targetRows)
+		for i := range lines {
+			lines[i] = emptyLine
+		}
+		return strings.Join(lines, "\n")
+	}
+
+	// Half-block only (native graphics are handled at grid level)
+	lines := strings.Split(strings.TrimRight(spr, "\n"), "\n")
+	if len(lines) > targetRows {
+		lines = lines[:targetRows]
+	}
+
+	leftPad := ((width - spriteWidth) / 2) + offsetX
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	if leftPad > width-spriteWidth {
+		leftPad = width - spriteWidth
+	}
+	rightPad := width - spriteWidth - leftPad
+	if rightPad < 0 {
+		rightPad = 0
+	}
+
+	leftPadStr := bgStyle.Render(strings.Repeat(" ", leftPad))
+	rightPadStr := bgStyle.Render(strings.Repeat(" ", rightPad))
+
+	var paddedLines []string
+	for _, l := range lines {
+		paddedLines = append(paddedLines, leftPadStr+l+rightPadStr)
+	}
+
+	// Center vertically
+	topPad := (targetRows - len(paddedLines)) / 2
+	bottomPad := targetRows - len(paddedLines) - topPad
+	var result []string
+	for i := 0; i < topPad; i++ {
+		result = append(result, emptyLine)
+	}
+	result = append(result, paddedLines...)
 	for i := 0; i < bottomPad; i++ {
 		result = append(result, emptyLine)
 	}
