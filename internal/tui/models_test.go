@@ -1460,6 +1460,11 @@ func TestMatchesModelDeathmatchDetail(t *testing.T) {
 
 	output := m.renderDetailView()
 
+	// Header outcome and placement checks (local player placed 5th)
+	if !strings.Contains(output, "LOSS  5th") {
+		t.Errorf("expected Deathmatch detail header to contain 'LOSS  5th', got:\n%s", output)
+	}
+
 	// 1. Structural checks: FFA layout, no team headers
 	if strings.Contains(output, "BLUE TEAM") || strings.Contains(output, "RED TEAM") || strings.Contains(output, "YOUR TEAM") {
 		t.Errorf("expected Deathmatch detail view to not contain team headers, got:\n%s", output)
@@ -1505,6 +1510,23 @@ func TestMatchesModelDeathmatchDetail(t *testing.T) {
 	}
 	if !(highAcsLowKillsIdx < selfIdx) {
 		t.Errorf("expected HighAcsLowKills (20 kills) before self (10 kills), got highAcsLowKillsIdx=%d, selfIdx=%d", highAcsLowKillsIdx, selfIdx)
+	}
+
+	// 6. Check winner detail view rendering (top fragger)
+	mWinner := NewMatchesModel(items, "p-top-fragger", nil, nil)
+	mWinner.SetSize(100, 30)
+	mWinner.viewMode = MatchViewDetail
+	winnerOutput := mWinner.renderDetailView()
+	if !strings.Contains(winnerOutput, "WIN  1st") {
+		t.Errorf("expected winner detail header to contain 'WIN  1st', got:\n%s", winnerOutput)
+	}
+
+	// 7. Check list view rendering (score column shows '5th', not '0-0')
+	mList := NewMatchesModel(items, "my-puuid", nil, nil)
+	mList.SetSize(100, 30)
+	listOutput := mList.renderListView()
+	if strings.Contains(listOutput, "0-0") || !strings.Contains(listOutput, "5th") {
+		t.Errorf("expected list view to render '5th' and not '0-0', got:\n%s", listOutput)
 	}
 }
 

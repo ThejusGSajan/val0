@@ -118,10 +118,21 @@ func (m MatchesModel) renderListView() string {
 			cursor = "▸ "
 		}
 
+		outcome := item.Outcome
+		score := item.Score
+		if item.Details != nil && item.Details.IsDeathmatch() {
+			if score == "" || score == "0-0" {
+				score = item.Details.ScoreString(m.playerPUUID)
+			}
+			if outcome == "" || outcome == "DRAW" {
+				outcome = item.Details.GetMatchOutcome(m.playerPUUID)
+			}
+		}
+
 		// Outcome styling
 		outcomeColor := ColorDraw
 		outcomeBox := "■"
-		switch item.Outcome {
+		switch outcome {
 		case "WIN":
 			outcomeColor = ColorWin
 		case "LOSS":
@@ -131,7 +142,7 @@ func (m MatchesModel) renderListView() string {
 		outcomeBadge := lipgloss.NewStyle().
 			Foreground(outcomeColor).
 			Bold(true).
-			Render(fmt.Sprintf("%s %-4s", outcomeBox, item.Outcome))
+			Render(fmt.Sprintf("%s %-4s", outcomeBox, outcome))
 
 		// Map & Mode
 		mapStr := lipgloss.NewStyle().
@@ -152,7 +163,7 @@ func (m MatchesModel) renderListView() string {
 		scoreStr := lipgloss.NewStyle().
 			Foreground(ColorFg).
 			Bold(true).
-			Render(fmt.Sprintf("%-6s", item.Score))
+			Render(fmt.Sprintf("%-6s", score))
 
 		// KDA
 		kdaStr := lipgloss.NewStyle().
@@ -219,27 +230,36 @@ func (m MatchesModel) renderDetailView() string {
 	d := item.Details
 	var sb strings.Builder
 
+	isDeathmatch := strings.EqualFold(item.QueueName, "Deathmatch") || (d != nil && d.IsDeathmatch())
+
+	outcome := item.Outcome
+	score := item.Score
+	if isDeathmatch && d != nil {
+		if score == "" || score == "0-0" {
+			score = d.ScoreString(m.playerPUUID)
+		}
+		if outcome == "" || outcome == "DRAW" {
+			outcome = d.GetMatchOutcome(m.playerPUUID)
+		}
+	}
+
 	// Header
 	outcomeColor := ColorDraw
-	if item.Outcome == "WIN" {
+	if outcome == "WIN" {
 		outcomeColor = ColorWin
-	} else if item.Outcome == "LOSS" {
+	} else if outcome == "LOSS" {
 		outcomeColor = ColorLoss
 	}
 
 	headerOutcome := lipgloss.NewStyle().
 		Foreground(outcomeColor).
 		Bold(true).
-		Render(fmt.Sprintf("%s  %s", item.Outcome, item.Score))
+		Render(fmt.Sprintf("%s  %s", outcome, score))
 
 	header := fmt.Sprintf("  MATCH DETAIL — %s (%s)", item.MapName, item.QueueName)
 	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(ColorFg).Render(header))
 	sb.WriteString("    " + headerOutcome + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
-
-	isDeathmatch := strings.EqualFold(item.QueueName, "Deathmatch") ||
-		(d != nil && strings.EqualFold(d.MatchInfo.QueueID, "deathmatch")) ||
-		(d != nil && strings.Contains(strings.ToLower(d.MatchInfo.GameMode), "deathmatch") && !strings.Contains(strings.ToLower(d.MatchInfo.GameMode), "hurm"))
 
 	if isDeathmatch {
 		sb.WriteString(m.renderDeathmatchTable(d))
@@ -383,15 +403,9 @@ func (m MatchesModel) renderDeathmatchTable(d *models.MatchDetails) string {
 	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow) + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
 
-	type dmPlayerRow struct {
-		player models.MatchPlayer
-		acs    int
-		name   string
-		agent  string
-	}
-
-	var rows []dmPlayerRow
-	for _, p := range d.Players {
+	leaderboard := d.GetDeathmatchLeaderboard()
+	for _, entry := range leaderboard {
+		p := entry.Player
 		name := ""
 		if p.Subject == m.playerPUUID {
 			name = "▸ You"
@@ -412,34 +426,9 @@ func (m MatchesModel) renderDeathmatchTable(d *models.MatchDetails) string {
 			}
 		}
 
-		acs, _, _, _ := d.ComputePlayerAdvancedStats(p.Subject)
-		rows = append(rows, dmPlayerRow{
-			player: p,
-			acs:    acs,
-			name:   name,
-			agent:  agentName,
-		})
-	}
-
-	// Sort descending by Kills; tie-breaker descending ACS; then ascending deaths; then descending assists
-	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i].player.Stats.Kills != rows[j].player.Stats.Kills {
-			return rows[i].player.Stats.Kills > rows[j].player.Stats.Kills
-		}
-		if rows[i].acs != rows[j].acs {
-			return rows[i].acs > rows[j].acs
-		}
-		if rows[i].player.Stats.Deaths != rows[j].player.Stats.Deaths {
-			return rows[i].player.Stats.Deaths < rows[j].player.Stats.Deaths
-		}
-		return rows[i].player.Stats.Assists > rows[j].player.Stats.Assists
-	})
-
-	for _, row := range rows {
-		p := row.player
 		playerRow := fmt.Sprintf("  %s  %s  %3d %3d %3d",
-			fitWidth(row.name, 18),
-			fitWidth(row.agent, 9),
+			fitWidth(name, 18),
+			fitWidth(agentName, 9),
 			p.Stats.Kills, p.Stats.Deaths, p.Stats.Assists,
 		)
 

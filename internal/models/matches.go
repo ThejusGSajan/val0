@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -163,8 +164,112 @@ func (m *MatchDetails) GetOpponentTeam(playerTeamID string) *MatchTeam {
 	return nil
 }
 
+// IsDeathmatch returns true if the match is a Free-For-All Deathmatch (excluding Team Deathmatch / Hurm).
+func (m *MatchDetails) IsDeathmatch() bool {
+	if m == nil {
+		return false
+	}
+	queue := strings.ToLower(m.MatchInfo.QueueID)
+	mode := strings.ToLower(m.MatchInfo.GameMode)
+	if strings.Contains(queue, "hurm") || strings.Contains(mode, "hurm") {
+		return false
+	}
+	return queue == "deathmatch" || strings.Contains(mode, "deathmatch")
+}
+
+// FormatOrdinal returns the 1-based ordinal representation of a rank (e.g. 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11 -> "11th").
+func FormatOrdinal(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	switch n % 100 {
+	case 11, 12, 13:
+		return fmt.Sprintf("%dth", n)
+	}
+	switch n % 10 {
+	case 1:
+		return fmt.Sprintf("%dst", n)
+	case 2:
+		return fmt.Sprintf("%dnd", n)
+	case 3:
+		return fmt.Sprintf("%drd", n)
+	default:
+		return fmt.Sprintf("%dth", n)
+	}
+}
+
+// DeathmatchPlayerEntry pairs a MatchPlayer with their computed ACS for Deathmatch leaderboard ranking.
+type DeathmatchPlayerEntry struct {
+	Player MatchPlayer
+	ACS    int
+}
+
+// GetDeathmatchLeaderboard returns all players sorted according to Deathmatch ranking rules:
+// 1. Descending Kills
+// 2. Descending ACS (Combat Score / roundsPlayed)
+// 3. Ascending Deaths (fewer deaths ranks higher)
+// 4. Descending Assists
+func (m *MatchDetails) GetDeathmatchLeaderboard() []DeathmatchPlayerEntry {
+	if m == nil || len(m.Players) == 0 {
+		return nil
+	}
+	entries := make([]DeathmatchPlayerEntry, len(m.Players))
+	for i, p := range m.Players {
+		rounds := p.Stats.RoundsPlayed
+		if rounds <= 0 {
+			rounds = 1
+		}
+		acs := p.Stats.Score / rounds
+		entries[i] = DeathmatchPlayerEntry{
+			Player: p,
+			ACS:    acs,
+		}
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].Player.Stats.Kills != entries[j].Player.Stats.Kills {
+			return entries[i].Player.Stats.Kills > entries[j].Player.Stats.Kills
+		}
+		if entries[i].ACS != entries[j].ACS {
+			return entries[i].ACS > entries[j].ACS
+		}
+		if entries[i].Player.Stats.Deaths != entries[j].Player.Stats.Deaths {
+			return entries[i].Player.Stats.Deaths < entries[j].Player.Stats.Deaths
+		}
+		return entries[i].Player.Stats.Assists > entries[j].Player.Stats.Assists
+	})
+
+	return entries
+}
+
+// GetDeathmatchRank returns the 1-based placement (1 for 1st, 2 for 2nd, etc.) of a player in a Deathmatch.
+// Returns 0 if the player is not found or match has no players.
+func (m *MatchDetails) GetDeathmatchRank(puuid string) int {
+	if m == nil || puuid == "" {
+		return 0
+	}
+	leaderboard := m.GetDeathmatchLeaderboard()
+	for idx, entry := range leaderboard {
+		if entry.Player.Subject == puuid {
+			return idx + 1
+		}
+	}
+	return 0
+}
+
 // GetMatchOutcome returns "WIN", "LOSS", or "DRAW" for the given player PUUID.
 func (m *MatchDetails) GetMatchOutcome(puuid string) string {
+	if m.IsDeathmatch() {
+		rank := m.GetDeathmatchRank(puuid)
+		if rank == 1 {
+			return "WIN"
+		}
+		if rank > 1 {
+			return "LOSS"
+		}
+		return "DRAW"
+	}
+
 	myTeam := m.GetPlayerTeam(puuid)
 	if myTeam == nil {
 		return "DRAW"
@@ -188,6 +293,14 @@ func (m *MatchDetails) GetMatchOutcome(puuid string) string {
 
 // ScoreString returns e.g. "13-7" (player team rounds - enemy team rounds).
 func (m *MatchDetails) ScoreString(puuid string) string {
+	if m.IsDeathmatch() {
+		rank := m.GetDeathmatchRank(puuid)
+		if rank > 0 {
+			return FormatOrdinal(rank)
+		}
+		return "0-0"
+	}
+
 	myTeam := m.GetPlayerTeam(puuid)
 	if myTeam == nil {
 		if len(m.Teams) >= 2 {
