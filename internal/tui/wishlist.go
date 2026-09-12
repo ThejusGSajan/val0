@@ -433,6 +433,7 @@ func (m WishlistModel) View() string {
 	previewBox := CardStyle.
 		BorderForeground(ColorBorder).
 		Width(previewContentWidth).
+		MarginRight(0).
 		Render(previewContent)
 
 	var previewOverlay *SpriteOverlay
@@ -471,13 +472,6 @@ func (m WishlistModel) View() string {
 		// leftPane width + spacer width + preview card's border(1) + pad(1) + margin
 		leftPaneWidth := lipgloss.Width(leftPane)
 		spacerWidth := 4 // "    " = 4 chars
-
-		// Wipe lines below the preview box with background color to eliminate residual black column
-		bgWipe := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", previewContentWidth+4))
-		for i := 8; i < len(splitLines); i++ {
-			splitLines[i] += bgWipe
-		}
-
 		previewSpriteMargin := (previewContentWidth - previewOverlay.ContentWidth) / 2
 		colOffset := leftPaneWidth + spacerWidth + 2 + previewSpriteMargin
 
@@ -485,24 +479,22 @@ func (m WishlistModel) View() string {
 		// linesUp from last line (totalLines - 1) to sprite row 0 (line 1) = totalLines - 2.
 		linesUp := totalLines - 2
 
-		// Use full preview content width for wipe (not reduced sprite width)
-		// to ensure the entire preview column is cleared of old Sixel artifacts
-		fullWipeColOffset := leftPaneWidth + spacerWidth + 2
-		wipe := buildWipeSeq(fullWipeColOffset, previewContentWidth, previewOverlay.SpriteRows)
+		// Shop v26 wipe: wipe precisely the sprite area at colOffset
+		wipe := buildWipeSeq(colOffset, previewOverlay.ContentWidth, previewOverlay.SpriteRows)
 
-		belowSpriteWipe := ""
-		extraWipeRows := 6 // Wipe 6 extra rows below the sprite for thorough Sixel cleanup
-		bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", previewContentWidth))
-		for i := 0; i < extraWipeRows; i++ {
-			belowSpriteWipe += fmt.Sprintf("\x1b[1B\x1b[%dG", fullWipeColOffset+1) + bgSpaces
-		}
+		// Shop v26 trailing wipe on the bottom line after \x1b8 cursor restore
+		totalSplitViewWidth := lipgloss.Width(splitView)
+		wipeCols := 120
+		trailingWipe := fmt.Sprintf("\x1b[48;2;15;17;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalSplitViewWidth+1)
+
+		// Zero-width OSC invalidator token to prevent Bubble Tea line-diff suppression during search typing
+		invalidator := fmt.Sprintf("\x1b]999;wl=%s;%d;%d;%d;%s\x07", m.searchInput, m.brCursor, m.wlCursor, m.focusSection, m.flashMsg)
 
 		payload := "\x1b7" +
 			fmt.Sprintf("\x1b[%dA", linesUp) +
 			fmt.Sprintf("\x1b[%dG", colOffset+1) +
 			wipe + previewOverlay.Payload +
-			belowSpriteWipe +
-			"\x1b8"
+			"\x1b8" + trailingWipe + invalidator
 		placeholder := sprite.RegisterPayload(payload)
 		splitLines[totalLines-1] += placeholder
 		splitView = strings.Join(splitLines, "\n")
