@@ -339,12 +339,12 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 		}
 	}
 
-	// Sort ascending by ACS (lowest ACS first); tie-breaker kills ascending
+	// Sort descending by ACS (highest ACS first); tie-breaker kills descending
 	sort.SliceStable(rows, func(i, j int) bool {
 		if rows[i].acs != rows[j].acs {
-			return rows[i].acs < rows[j].acs
+			return rows[i].acs > rows[j].acs
 		}
-		return rows[i].player.Stats.Kills < rows[j].player.Stats.Kills
+		return rows[i].player.Stats.Kills > rows[j].player.Stats.Kills
 	})
 
 	for _, row := range rows {

@@ -1303,7 +1303,7 @@ func TestMatchListRelativeTimeAlignment(t *testing.T) {
 	}
 }
 
-func TestRenderTeamTableAscendingACS(t *testing.T) {
+func TestRenderTeamTableDescendingACS(t *testing.T) {
 	details := &models.MatchDetails{
 		Players: []models.MatchPlayer{
 			{
@@ -1363,7 +1363,7 @@ func TestRenderTeamTableAscendingACS(t *testing.T) {
 		t.Fatalf("players missing from table:\n%s", table)
 	}
 
-	if !(lowIdx < midIdx && midIdx < highIdx) {
-		t.Errorf("players not sorted in ascending order of ACS! indices: Low=%d, Mid=%d, High=%d\n%s", lowIdx, midIdx, highIdx, table)
+	if !(highIdx < midIdx && midIdx < lowIdx) {
+		t.Errorf("players not sorted in descending order of ACS! indices: High=%d, Mid=%d, Low=%d\n%s", highIdx, midIdx, lowIdx, table)
 	}
 }

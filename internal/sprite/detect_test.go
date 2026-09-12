@@ -29,18 +29,23 @@ func TestDetectTerminalProtocol(t *testing.T) {
 
 	os.Unsetenv("VAL0_GRAPHICS")
 
-	// Test Windows Terminal defaults to HalfBlock
+	// Test Windows Terminal defaults to Sixel
 	os.Setenv("WT_SESSION", "test-guid-123")
-	if probeEnvironment() != ProtocolHalfBlock {
-		t.Errorf("expected ProtocolHalfBlock for WT_SESSION, got %v", probeEnvironment())
+	if probeEnvironment() != ProtocolSixel {
+		t.Errorf("expected ProtocolSixel for WT_SESSION, got %v", probeEnvironment())
 	}
 
-	// Test Windows Terminal with explicit VAL0_GRAPHICS=sixel override
-	os.Setenv("VAL0_GRAPHICS", "sixel")
-	if probeEnvironment() != ProtocolSixel {
-		t.Errorf("expected ProtocolSixel for WT_SESSION with VAL0_GRAPHICS=sixel, got %v", probeEnvironment())
+	// Test Windows Terminal with explicit VAL0_GRAPHICS=halfblock override
+	os.Setenv("VAL0_GRAPHICS", "halfblock")
+	if probeEnvironment() != ProtocolHalfBlock {
+		t.Errorf("expected ProtocolHalfBlock for WT_SESSION with VAL0_GRAPHICS=halfblock, got %v", probeEnvironment())
 	}
 	os.Unsetenv("VAL0_GRAPHICS")
 	os.Unsetenv("WT_SESSION")
+
+	// Test fallback when WT_SESSION is not set
+	if probeEnvironment() != ProtocolHalfBlock {
+		t.Errorf("expected ProtocolHalfBlock when WT_SESSION is unset, got %v", probeEnvironment())
+	}
 }
 
