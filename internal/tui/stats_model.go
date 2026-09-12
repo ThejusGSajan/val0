@@ -67,6 +67,12 @@ func NewStatsModel(
 			continue
 		}
 
+		// Skip casual/non-structured modes — not meaningful for agent performance stats
+		queueID := strings.ToLower(md.MatchInfo.QueueID)
+		if queueID == "deathmatch" || queueID == "skirmish" || queueID == "hurm" || queueID == "ggteam" {
+			continue
+		}
+
 		agentName := cache.GetAgentName(player.CharacterID, agentsMap)
 		aStat, ok := agentMap[agentName]
 		if !ok {
@@ -259,44 +265,6 @@ func (m StatsModel) View() string {
 
 	sections = append(sections, "")
 
-	// ── Section 3: Aim Analysis (HS% Sparkline) ────────────────────
-	sec3Header := lipgloss.NewStyle().
-		Foreground(ColorSelect).
-		Bold(true).
-		Render("  📈 AIM ANALYSIS — Headshot % Trend")
-	sections = append(sections, sec3Header)
-	sections = append(sections, "  "+strings.Repeat("─", lineWidth))
-
-	if len(m.hsHistory) > 0 {
-		sparkline := renderSparkline(m.hsHistory, 40)
-		sections = append(sections, sparkline)
-
-		currentHS := m.hsHistory[0]
-		avgHS := 0
-		sum := 0
-		for _, h := range m.hsHistory {
-			sum += h
-		}
-		if len(m.hsHistory) > 0 {
-			avgHS = sum / len(m.hsHistory)
-		}
-		trendStr := "→ Flat"
-		if currentHS > avgHS {
-			trendStr = fmt.Sprintf("↑ +%d%%", currentHS-avgHS)
-		} else if currentHS < avgHS {
-			trendStr = fmt.Sprintf("↓ -%d%%", avgHS-currentHS)
-		}
-
-		summary := lipgloss.NewStyle().
-			Foreground(ColorFg).
-			Render(fmt.Sprintf("  Current: %d%%   Avg: %d%%   Trend: %s", currentHS, avgHS, trendStr))
-		sections = append(sections, summary)
-	} else {
-		sections = append(sections, "  No HS% trend data available.")
-	}
-
-	sections = append(sections, "")
-
 	// ── Section 4: Rank Rating History ─────────────────────────────
 	sec4Header := lipgloss.NewStyle().
 		Foreground(ColorDeluxe).
@@ -367,7 +335,7 @@ func renderSparkline(values []int, maxBars int) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("  [Recent] ")
+	sb.WriteString("  [Oldest] ")
 	n := min(len(values), maxBars)
 	for i := n - 1; i >= 0; i-- {
 		val := values[i]
@@ -380,7 +348,7 @@ func renderSparkline(values []int, maxBars int) string {
 		}
 		sb.WriteRune(bars[idx])
 	}
-	sb.WriteString(" [Oldest]\n")
+	sb.WriteString(" [Recent]\n")
 	return sb.String()
 }
 
@@ -390,7 +358,7 @@ func renderSignedSparkline(values []int, maxBars int) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("  [Recent] ")
+	sb.WriteString("  [Oldest] ")
 	n := min(len(values), maxBars)
 	for i := n - 1; i >= 0; i-- {
 		v := values[i]
@@ -403,7 +371,7 @@ func renderSignedSparkline(values []int, maxBars int) string {
 		}
 		sb.WriteString(" ")
 	}
-	sb.WriteString("[Oldest]\n")
+	sb.WriteString("[Recent]\n")
 	return sb.String()
 }
 

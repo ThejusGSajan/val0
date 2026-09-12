@@ -493,8 +493,8 @@ func TestStatsModelView(t *testing.T) {
 	if !strings.Contains(view, "WEAPON STATS") {
 		t.Errorf("expected WEAPON STATS in view, got:\n%s", view)
 	}
-	if !strings.Contains(view, "AIM ANALYSIS") {
-		t.Errorf("expected AIM ANALYSIS in view, got:\n%s", view)
+	if strings.Contains(view, "AIM ANALYSIS") {
+		t.Errorf("expected AIM ANALYSIS to be removed from view, got:\n%s", view)
 	}
 	if !strings.Contains(view, "RANK RATING") {
 		t.Errorf("expected RANK RATING in view, got:\n%s", view)
