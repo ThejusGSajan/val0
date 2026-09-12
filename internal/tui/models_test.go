@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/val-tracker/val-tracker/internal/auth"
 	"github.com/val-tracker/val-tracker/internal/cache"
@@ -1215,5 +1217,153 @@ func TestGlobalKeyLegendStandardization(t *testing.T) {
 	}
 }
 
+func TestResolveQueueDisplayName(t *testing.T) {
+	tests := []struct {
+		queueID  string
+		gameMode string
+		expected string
+	}{
+		{"competitive", "", "Competitive"},
+		{"unrated", "", "Unrated"},
+		{"deathmatch", "", "Deathmatch"},
+		{"skirmish", "", "Skirmish"},
+		{"", "/Game/GameModes/Skirmish/SkirmishGameMode.SkirmishGameMode_C", "Skirmish"},
+		{"", "/Game/GameModes/Deathmatch/DeathmatchGameMode.DeathmatchGameMode_C", "Deathmatch"},
+		{"", "", "Unknown"},
+	}
 
+	for _, tc := range tests {
+		got := ResolveQueueDisplayName(tc.queueID, tc.gameMode)
+		if got != tc.expected {
+			t.Errorf("ResolveQueueDisplayName(%q, %q) = %q, want %q", tc.queueID, tc.gameMode, got, tc.expected)
+		}
+	}
+}
 
+func TestFitWidthWideCharacters(t *testing.T) {
+	// Katakana wide character 'ツ'
+	nameWithWideRune := "Luffyツ #Doofy"
+	fitted := fitWidth(nameWithWideRune, 18)
+	if lipgloss.Width(fitted) != 18 {
+		t.Errorf("expected fitWidth visual width 18, got %d for %q", lipgloss.Width(fitted), fitted)
+	}
+
+	asciiName := "NormalPlayer#123"
+	fittedAscii := fitWidth(asciiName, 18)
+	if lipgloss.Width(fittedAscii) != 18 {
+		t.Errorf("expected fitWidth visual width 18, got %d for %q", lipgloss.Width(fittedAscii), fittedAscii)
+	}
+}
+
+func TestMatchListRelativeTimeAlignment(t *testing.T) {
+	now := time.Now().Add(-2 * time.Hour)
+	items := []MatchItem{
+		{
+			MatchID:     "m1",
+			MapName:     "Ascent",
+			QueueName:   "Competitive",
+			AgentName:   "Jett",
+			Score:       "13-11",
+			Outcome:     "WIN",
+			HasRR:       true,
+			RREarned:    14,
+			GameTime:    now,
+			PlayerPUUID: "p1",
+		},
+		{
+			MatchID:     "m2",
+			MapName:     "Bind",
+			QueueName:   "Deathmatch",
+			AgentName:   "Reyna",
+			Score:       "40-35",
+			Outcome:     "WIN",
+			HasRR:       false,
+			GameTime:    now,
+			PlayerPUUID: "p1",
+		},
+	}
+
+	m := NewMatchesModel(items, "p1", nil, nil)
+	m.SetSize(120, 30)
+	view := m.View()
+
+	lines := strings.Split(view, "\n")
+	var timeColIdx []int
+	for _, l := range lines {
+		if idx := strings.Index(l, "2h ago"); idx != -1 {
+			timeColIdx = append(timeColIdx, lipgloss.Width(l[:idx]))
+		}
+	}
+
+	if len(timeColIdx) < 2 {
+		t.Fatalf("expected at least 2 match lines with time, found %d", len(timeColIdx))
+	}
+	if timeColIdx[0] != timeColIdx[1] {
+		t.Errorf("time column index mismatch: row 0 is at col %d, row 1 is at col %d", timeColIdx[0], timeColIdx[1])
+	}
+}
+
+func TestRenderTeamTableAscendingACS(t *testing.T) {
+	details := &models.MatchDetails{
+		Players: []models.MatchPlayer{
+			{
+				Subject:     "p1",
+				TeamID:      "Blue",
+				GameName:    "HighScorer",
+				CharacterID: "c1",
+				Stats: models.PlayerStats{
+					Score:   6000,
+					RoundsPlayed: 20,
+					Kills:   25,
+					Deaths:  10,
+					Assists: 5,
+				},
+			},
+			{
+				Subject:     "p2",
+				TeamID:      "Blue",
+				GameName:    "LowScorer",
+				CharacterID: "c2",
+				Stats: models.PlayerStats{
+					Score:   2000,
+					RoundsPlayed: 20,
+					Kills:   8,
+					Deaths:  15,
+					Assists: 2,
+				},
+			},
+			{
+				Subject:     "p3",
+				TeamID:      "Blue",
+				GameName:    "MidScorer",
+				CharacterID: "c3",
+				Stats: models.PlayerStats{
+					Score:   4000,
+					RoundsPlayed: 20,
+					Kills:   15,
+					Deaths:  12,
+					Assists: 4,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+		},
+	}
+
+	m := NewMatchesModel(nil, "spectator-puuid", nil, nil)
+	m.SetSize(100, 30)
+	table := m.renderTeamTable(details, "Blue", true)
+
+	lowIdx := strings.Index(table, "LowScorer")
+	midIdx := strings.Index(table, "MidScorer")
+	highIdx := strings.Index(table, "HighScorer")
+
+	if lowIdx == -1 || midIdx == -1 || highIdx == -1 {
+		t.Fatalf("players missing from table:\n%s", table)
+	}
+
+	if !(lowIdx < midIdx && midIdx < highIdx) {
+		t.Errorf("players not sorted in ascending order of ACS! indices: Low=%d, Mid=%d, High=%d\n%s", lowIdx, midIdx, highIdx, table)
+	}
+}

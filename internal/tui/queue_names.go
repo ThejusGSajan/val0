@@ -10,6 +10,7 @@ var queueDisplayNames = map[string]string{
 	"competitive": "Competitive",
 	"unrated":     "Unrated",
 	"deathmatch":  "Deathmatch",
+	"skirmish":    "Skirmish",
 	"spikerush":   "Spike Rush",
 	"swiftplay":   "Swiftplay",
 	"hurm":        "Team Deathmatch",
@@ -32,4 +33,41 @@ func GetQueueDisplayName(queueID string) string {
 		return strings.ToUpper(queueID[:1]) + queueID[1:]
 	}
 	return "Unknown"
+}
+
+// ResolveQueueDisplayName resolves human-readable queue name from QueueID,
+// falling back to inspecting the GameMode asset path if QueueID is empty or unknown.
+func ResolveQueueDisplayName(queueID, gameMode string) string {
+	if name, ok := queueDisplayNames[strings.ToLower(queueID)]; ok && name != "Unknown" {
+		return name
+	}
+	// Fallback: inspect GameMode asset path
+	if gameMode != "" {
+		gmLower := strings.ToLower(gameMode)
+		if strings.Contains(gmLower, "skirmish") {
+			return "Skirmish"
+		}
+		if strings.Contains(gmLower, "deathmatch") {
+			return "Deathmatch"
+		}
+		if strings.Contains(gmLower, "hurm") {
+			return "Team Deathmatch"
+		}
+		if strings.Contains(gmLower, "spikerush") {
+			return "Spike Rush"
+		}
+		if strings.Contains(gmLower, "swiftplay") {
+			return "Swiftplay"
+		}
+		if strings.Contains(gmLower, "onefa") {
+			return "Replication"
+		}
+		if strings.Contains(gmLower, "ggteam") {
+			return "Escalation"
+		}
+		if strings.Contains(gmLower, "snowball") {
+			return "Snowball Fight"
+		}
+	}
+	return GetQueueDisplayName(queueID)
 }

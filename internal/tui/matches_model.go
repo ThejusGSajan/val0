@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -159,7 +160,7 @@ func (m MatchesModel) renderListView() string {
 			Render(fmt.Sprintf("K %2d D %2d A %2d", item.Kills, item.Deaths, item.Assists))
 
 		// RR delta
-		rrStr := "       "
+		var rrStr string
 		if item.HasRR {
 			sign := "+"
 			rrColor := ColorWin
@@ -169,10 +170,14 @@ func (m MatchesModel) renderListView() string {
 			} else if item.RREarned == 0 {
 				rrColor = ColorDraw
 			}
+			rawRR := fmt.Sprintf("%s%2d RR", sign, item.RREarned)
+			paddedRR := fmt.Sprintf("%-7s", rawRR)
 			rrStr = lipgloss.NewStyle().
 				Foreground(rrColor).
 				Bold(true).
-				Render(fmt.Sprintf("%s%2d RR", sign, item.RREarned))
+				Render(paddedRR)
+		} else {
+			rrStr = "       "
 		}
 
 		// Relative Time
@@ -180,7 +185,7 @@ func (m MatchesModel) renderListView() string {
 			Foreground(ColorMuted).
 			Render(formatTimeAgo(item.GameTime))
 
-		row := fmt.Sprintf("%s%s  %s  %s  %s  %s  %s   %-8s  %s",
+		row := fmt.Sprintf("%s%s  %s  %s  %s  %s  %s   %s  %s",
 			cursor, outcomeBadge, mapStr, queueStr, agentStr, scoreStr, kdaStr, rrStr, timeStr)
 
 		if i == m.cursor {
@@ -279,13 +284,25 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 		teamLabel += " (YOUR TEAM)"
 	}
 
-	sb.WriteString(lipgloss.NewStyle().Foreground(teamColor).Bold(true).Render(teamLabel))
-	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf(" — %d rounds\n", roundsWon)))
-	headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s\n",
+	teamHeader := lipgloss.NewStyle().Foreground(teamColor).Bold(true).Render(teamLabel) +
+		lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf(" — %d rounds", roundsWon))
+	sb.WriteString(teamHeader + "\n")
+	headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s",
 		"Player", "Agent", "ACS", "K", "D", "A", "HS%", "ADR", "Econ")
-	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow))
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow) + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
 
+	type teamPlayerRow struct {
+		player models.MatchPlayer
+		acs    int
+		adr    int
+		hsPct  int
+		econ   int
+		name   string
+		agent  string
+	}
+
+	var rows []teamPlayerRow
 	for _, p := range d.Players {
 		if strings.EqualFold(p.TeamID, teamID) {
 			name := ""
@@ -310,22 +327,42 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 			}
 
 			acs, adr, hsPct, econ := d.ComputePlayerAdvancedStats(p.Subject)
-
-			playerRow := fmt.Sprintf("  %-18s  %-9s  %3d  %3d %3d %3d   %3d%%   %4d   %4d",
-				truncate(name, 18),
-				truncate(agentName, 9),
-				acs,
-				p.Stats.Kills, p.Stats.Deaths, p.Stats.Assists,
-				hsPct,
-				adr,
-				econ,
-			)
-
-			if p.Subject == m.playerPUUID {
-				playerRow = lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render(playerRow)
-			}
-			sb.WriteString(playerRow + "\n")
+			rows = append(rows, teamPlayerRow{
+				player: p,
+				acs:    acs,
+				adr:    adr,
+				hsPct:  hsPct,
+				econ:   econ,
+				name:   name,
+				agent:  agentName,
+			})
 		}
+	}
+
+	// Sort ascending by ACS (lowest ACS first); tie-breaker kills ascending
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].acs != rows[j].acs {
+			return rows[i].acs < rows[j].acs
+		}
+		return rows[i].player.Stats.Kills < rows[j].player.Stats.Kills
+	})
+
+	for _, row := range rows {
+		p := row.player
+		playerRow := fmt.Sprintf("  %s  %s  %3d  %3d %3d %3d   %3d%%   %4d   %4d",
+			fitWidth(row.name, 18),
+			fitWidth(row.agent, 9),
+			row.acs,
+			p.Stats.Kills, p.Stats.Deaths, p.Stats.Assists,
+			row.hsPct,
+			row.adr,
+			row.econ,
+		)
+
+		if p.Subject == m.playerPUUID {
+			playerRow = lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render(playerRow)
+		}
+		sb.WriteString(playerRow + "\n")
 	}
 	return sb.String()
 }
@@ -379,14 +416,41 @@ func formatTimeAgo(t time.Time) string {
 	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+func padRight(s string, width int) string {
+	w := lipgloss.Width(s)
+	if w >= width {
 		return s
 	}
-	if maxLen <= 3 {
-		return s[:maxLen]
+	return s + strings.Repeat(" ", width-w)
+}
+
+func fitWidth(s string, width int) string {
+	return padRight(truncate(s, width), width)
+}
+
+func truncate(s string, maxLen int) string {
+	if lipgloss.Width(s) <= maxLen {
+		return s
 	}
-	return s[:maxLen-2] + ".."
+	if maxLen <= 2 {
+		var sb strings.Builder
+		for _, r := range s {
+			if lipgloss.Width(sb.String()+string(r)) > maxLen {
+				break
+			}
+			sb.WriteRune(r)
+		}
+		return sb.String()
+	}
+	targetWidth := maxLen - 2
+	var sb strings.Builder
+	for _, r := range s {
+		if lipgloss.Width(sb.String()+string(r)) > targetWidth {
+			break
+		}
+		sb.WriteRune(r)
+	}
+	return sb.String() + ".."
 }
 
 func max(a, b int) int {

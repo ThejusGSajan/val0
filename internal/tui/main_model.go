@@ -892,7 +892,7 @@ func (m MainModel) loadData() tea.Msg {
 			if hasDetail && d != nil {
 				item.Details = d
 				item.MapName = cache.GetMapName(d.MatchInfo.MapID, mapsMap)
-				item.QueueName = GetQueueDisplayName(d.MatchInfo.QueueID)
+				item.QueueName = ResolveQueueDisplayName(d.MatchInfo.QueueID, d.MatchInfo.GameMode)
 				item.Outcome = d.GetMatchOutcome(m.session.PUUID)
 				item.Score = d.ScoreString(m.session.PUUID)
 
