@@ -242,12 +242,12 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		renderTargetURL = skin.IconURL
 	}
 	const spriteTargetRows = 5 // fixed height for all sprite containers
-	spriteRenderWidth := cardContentWidth - 4 // 2-col margin on each side to prevent border collision
+	spriteRenderWidth := cardContentWidth
 	if spriteRenderWidth < 16 {
 		spriteRenderWidth = 16
 	}
 	if renderTargetURL != "" && cardContentWidth >= 20 {
-		spr = sprite.Render(renderTargetURL, spriteRenderWidth, spriteTargetRows)
+		spr = sprite.RenderTrimmed(renderTargetURL, spriteRenderWidth, spriteTargetRows)
 	} else if skin.Sprite != "" {
 		spr = skin.Sprite
 	}

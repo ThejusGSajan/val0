@@ -126,6 +126,126 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 	return result
 }
 
+func trimTransparency(img image.Image) image.Image {
+	bounds := img.Bounds()
+	minX, minY := bounds.Max.X, bounds.Max.Y
+	maxX, maxY := bounds.Min.X, bounds.Min.Y
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			_, _, _, a := img.At(x, y).RGBA()
+			if (a >> 8) > 10 {
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if y > maxY {
+					maxY = y
+				}
+			}
+		}
+	}
+
+	if minX > maxX || minY > maxY {
+		return img // return original if empty or fully transparent
+	}
+
+	if sub, ok := img.(interface {
+		SubImage(r image.Rectangle) image.Image
+	}); ok {
+		return sub.SubImage(image.Rect(minX, minY, maxX+1, maxY+1))
+	}
+
+	rect := image.Rect(0, 0, maxX-minX+1, maxY-minY+1)
+	newImg := image.NewRGBA(rect)
+	draw.Draw(newImg, rect, img, image.Point{minX, minY}, draw.Src)
+	return newImg
+}
+
+func RenderTrimmed(iconURL string, widthCols int, targetRows int) string {
+	if iconURL == "" || widthCols < 10 || targetRows <= 0 {
+		return ""
+	}
+
+	proto := DetectTerminalProtocol()
+	cacheKey := fmt.Sprintf("%s:%d:%d:%s:trimmed", iconURL, widthCols, targetRows, proto.String())
+
+	spriteMutex.Lock()
+	if cached, ok := spriteMap[cacheKey]; ok {
+		spriteMutex.Unlock()
+		return cached
+	}
+	spriteMutex.Unlock()
+
+	img, err := fetchImage(iconURL)
+	if err != nil {
+		return ""
+	}
+
+	img = trimTransparency(img)
+
+	var result string
+	if proto != ProtocolHalfBlock {
+		const cellW = 10
+		const cellH = 20
+		targetPixelWidth := widthCols * cellW
+		targetPixelHeight := targetRows * cellH
+
+		effectiveWidthCols := widthCols - 4
+		if effectiveWidthCols < 10 {
+			effectiveWidthCols = widthCols
+		}
+		effectivePixelWidth := effectiveWidthCols * cellW
+
+		resized := resize.Thumbnail(uint(effectivePixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
+
+		canvas := image.NewRGBA(image.Rect(0, 0, targetPixelWidth, targetPixelHeight))
+		bgColor := color.RGBA{R: 15, G: 17, B: 23, A: 255}
+		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: bgColor}, image.Point{}, draw.Src)
+
+		offsetX := (targetPixelWidth - resized.Bounds().Dx()) / 2
+		offsetY := (targetPixelHeight - resized.Bounds().Dy()) / 2
+		draw.Draw(canvas, image.Rect(offsetX, offsetY, offsetX+resized.Bounds().Dx(), offsetY+resized.Bounds().Dy()), resized, image.Point{}, draw.Over)
+
+		switch proto {
+		case ProtocolSixel:
+			if str, err := renderSixel(canvas); err == nil {
+				result = str
+			}
+		case ProtocolKitty:
+			if str, err := renderKitty(canvas, widthCols, targetRows); err == nil {
+				result = str
+			}
+		case ProtocolITerm2:
+			if str, err := renderITerm2(canvas, widthCols); err == nil {
+				result = str
+			}
+		}
+	}
+
+	if result == "" {
+		clampedWidth := widthCols
+		if clampedWidth > 55 {
+			clampedWidth = 55
+		}
+		if clampedWidth < 20 {
+			clampedWidth = 20
+		}
+		result = renderHalfBlocks(img, clampedWidth, targetRows)
+	}
+
+	spriteMutex.Lock()
+	spriteMap[cacheKey] = result
+	spriteMutex.Unlock()
+
+	return result
+}
+
 func fetchImage(url string) (image.Image, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
