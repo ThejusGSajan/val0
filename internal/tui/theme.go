@@ -15,6 +15,7 @@ var (
 	ColorPremium   = lipgloss.Color("#D1548D") // Premium — Pink/Magenta
 	ColorExclusive = lipgloss.Color("#F5955B") // Exclusive — Orange
 	ColorUltra     = lipgloss.Color("#FAD663") // Ultra — Gold/Yellow
+	ColorWishlist  = lipgloss.Color("#FFFFFF") // Wishlist — White
 
 	ColorMuted     = lipgloss.Color("#6B7280")
 	ColorFg        = lipgloss.Color("#E5E7EB")

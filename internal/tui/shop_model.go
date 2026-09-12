@@ -320,7 +320,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 
 	borderCol := rarityColor
 	if inWishlist {
-		borderCol = ColorUltra // Gold border for wishlist matches
+		borderCol = ColorWishlist // white border for wishlist skins
 	}
 
 	// Render Card: Width(cardContentWidth) ensures zero trailing space padding inside the card
