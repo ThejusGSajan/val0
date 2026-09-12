@@ -148,7 +148,14 @@ func (m ShopModel) View() string {
 
 		var gridRow string
 		if rightCard != nil {
-			gridRow = lipgloss.JoinHorizontal(lipgloss.Top, leftCard.rendered, rightCard.rendered)
+			cardLines := strings.Count(leftCard.rendered, "\n") + 1
+			spacerLine := lipgloss.NewStyle().Background(ColorBg).Render(" ")
+			spacerLines := make([]string, cardLines)
+			for s := range spacerLines {
+				spacerLines[s] = spacerLine
+			}
+			spacer := strings.Join(spacerLines, "\n")
+			gridRow = lipgloss.JoinHorizontal(lipgloss.Top, leftCard.rendered, spacer, rightCard.rendered)
 		} else {
 			gridRow = leftCard.rendered
 		}
@@ -161,30 +168,43 @@ func (m ShopModel) View() string {
 		// linesUp from last line (totalLines - 1) to sprite row 0 (line 2) = totalLines - 3
 		linesUp := totalLines - 3
 
+		totalGridRowWidth := cardContentWidth + 4
+		if rightCard != nil {
+			totalGridRowWidth = (cardContentWidth+4)*2 + 1
+		}
+		wipeCols := 120
+		trailingWipe := fmt.Sprintf("\x1b[48;2;15;17;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalGridRowWidth+1)
+
+		hasRightOverlay := rightCard != nil && rightCard.overlay != nil
+
 		// Inject left card overlay
 		if leftCard.overlay != nil {
 			spriteMargin := (cardContentWidth - leftCard.overlay.ContentWidth) / 2
 			colOffset := 2 + spriteMargin + leftCard.overlay.OffsetX // left border(1) + left pad(1) + margin + offset
 			wipe := buildWipeSeq(colOffset, leftCard.overlay.ContentWidth, leftCard.overlay.SpriteRows)
+			tw := ""
+			if !hasRightOverlay {
+				tw = trailingWipe
+			}
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
 				fmt.Sprintf("\x1b[%dG", colOffset+1) +
-				wipe + leftCard.overlay.Payload + "\x1b8"
+				wipe + leftCard.overlay.Payload + "\x1b8" + tw
 			placeholder := sprite.RegisterPayload(payload)
 			gridRowLines[totalLines-1] += placeholder
 		}
 
 		// Inject right card overlay
 		if rightCard != nil && rightCard.overlay != nil {
-			// Right card starts after left card total width (cardContentWidth + 5)
-			rightCardStart := cardContentWidth + 5 // 1 border + 1 pad + ccw + 1 pad + 1 border + 1 margin
+			// Right card starts after left card total width + spacer (cardContentWidth + 5)
+			rightCardStart := cardContentWidth + 5 // 1 border + 1 pad + ccw + 1 pad + 1 border + 1 spacer
 			spriteMarginR := (cardContentWidth - rightCard.overlay.ContentWidth) / 2
 			colOffset := rightCardStart + 2 + spriteMarginR + rightCard.overlay.OffsetX // + right card's left border(1) + left pad(1) + margin + offset
 			wipe := buildWipeSeq(colOffset, rightCard.overlay.ContentWidth, rightCard.overlay.SpriteRows)
 			payload := "\x1b7" +
 				fmt.Sprintf("\x1b[%dA", linesUp) +
 				fmt.Sprintf("\x1b[%dG", colOffset+1) +
-				wipe + rightCard.overlay.Payload + "\x1b8"
+				wipe + rightCard.overlay.Payload + "\x1b8" + trailingWipe
 			placeholder := sprite.RegisterPayload(payload)
 			gridRowLines[totalLines-1] += placeholder
 		}
@@ -307,6 +327,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 	cardBox := CardStyle.
 		BorderForeground(borderCol).
 		Width(cardContentWidth).
+		MarginRight(0).
 		Render(content.String())
 
 	return cardBox, overlay
