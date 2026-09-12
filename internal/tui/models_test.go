@@ -1367,3 +1367,167 @@ func TestRenderTeamTableDescendingACS(t *testing.T) {
 		t.Errorf("players not sorted in descending order of ACS! indices: High=%d, Mid=%d, Low=%d\n%s", highIdx, midIdx, lowIdx, table)
 	}
 }
+
+func TestMatchesModelDeathmatchDetail(t *testing.T) {
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			QueueID:  "deathmatch",
+			GameMode: "/Game/GameModes/Deathmatch/DeathmatchGameMode.DeathmatchGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     "p-tied-lower-acs",
+				GameName:    "TiedLowerACS",
+				CharacterID: "c1",
+				Stats: models.PlayerStats{
+					Kills:        35,
+					Deaths:       15,
+					Assists:      2,
+					Score:        3500,
+					RoundsPlayed: 1,
+				},
+			},
+			{
+				Subject:     "p-tied-higher-acs",
+				GameName:    "TiedHigherACS",
+				CharacterID: "c2",
+				Stats: models.PlayerStats{
+					Kills:        35,
+					Deaths:       12,
+					Assists:      3,
+					Score:        4200,
+					RoundsPlayed: 1,
+				},
+			},
+			{
+				Subject:     "p-top-fragger",
+				GameName:    "TopFragger",
+				CharacterID: "c3",
+				Stats: models.PlayerStats{
+					Kills:        40,
+					Deaths:       10,
+					Assists:      5,
+					Score:        3800,
+					RoundsPlayed: 1,
+				},
+			},
+			{
+				Subject:     "p-high-acs-low-kills",
+				GameName:    "HighAcsLowKills",
+				CharacterID: "c4",
+				Stats: models.PlayerStats{
+					Kills:        20,
+					Deaths:       20,
+					Assists:      1,
+					Score:        5000,
+					RoundsPlayed: 1,
+				},
+			},
+			{
+				Subject:     "my-puuid",
+				GameName:    "SelfPlayer",
+				CharacterID: "c5",
+				Stats: models.PlayerStats{
+					Kills:        10,
+					Deaths:       25,
+					Assists:      0,
+					Score:        1000,
+					RoundsPlayed: 1,
+				},
+			},
+		},
+		RoundResults: []models.RoundResult{
+			{
+				RoundNum:    0,
+				WinningTeam: "Blue",
+			},
+		},
+	}
+
+	items := []MatchItem{
+		{
+			MatchID:     "dm-match-1",
+			MapName:     "Ascent",
+			QueueName:   "Deathmatch",
+			Details:     details,
+			PlayerPUUID: "my-puuid",
+		},
+	}
+
+	m := NewMatchesModel(items, "my-puuid", nil, nil)
+	m.SetSize(100, 30)
+	m.viewMode = MatchViewDetail
+
+	output := m.renderDetailView()
+
+	// 1. Structural checks: FFA layout, no team headers
+	if strings.Contains(output, "BLUE TEAM") || strings.Contains(output, "RED TEAM") || strings.Contains(output, "YOUR TEAM") {
+		t.Errorf("expected Deathmatch detail view to not contain team headers, got:\n%s", output)
+	}
+
+	// 2. Timeline omitted
+	if strings.Contains(output, "ROUND TIMELINE") {
+		t.Errorf("expected Deathmatch detail view to omit ROUND TIMELINE, got:\n%s", output)
+	}
+
+	// 3. Stats columns: Player, Agent, K, D, A present; ACS, HS%, ADR, Econ omitted
+	if !strings.Contains(output, "Player") || !strings.Contains(output, "Agent") || !strings.Contains(output, "K") || !strings.Contains(output, "D") || !strings.Contains(output, "A") {
+		t.Errorf("expected columns Player, Agent, K, D, A in Deathmatch table, got:\n%s", output)
+	}
+	if strings.Contains(output, " ACS ") || strings.Contains(output, "HS%") || strings.Contains(output, "ADR") || strings.Contains(output, "Econ") {
+		t.Errorf("expected ACS, HS%%, ADR, Econ to be omitted from Deathmatch table, got:\n%s", output)
+	}
+
+	// 4. Local player representation
+	if !strings.Contains(output, "▸ You") {
+		t.Errorf("expected local player to be displayed as '▸ You', got:\n%s", output)
+	}
+
+	// 5. Ranking & Sorting checks
+	topIdx := strings.Index(output, "TopFragger")
+	tiedHighIdx := strings.Index(output, "TiedHigherACS")
+	tiedLowIdx := strings.Index(output, "TiedLowerACS")
+	highAcsLowKillsIdx := strings.Index(output, "HighAcsLowKills")
+	selfIdx := strings.Index(output, "▸ You")
+
+	if topIdx == -1 || tiedHighIdx == -1 || tiedLowIdx == -1 || highAcsLowKillsIdx == -1 || selfIdx == -1 {
+		t.Fatalf("one or more players missing from Deathmatch table:\n%s", output)
+	}
+
+	if !(topIdx < tiedHighIdx) {
+		t.Errorf("expected TopFragger (40 kills) before TiedHigherACS (35 kills), got topIdx=%d, tiedHighIdx=%d", topIdx, tiedHighIdx)
+	}
+	if !(tiedHighIdx < tiedLowIdx) {
+		t.Errorf("expected TiedHigherACS (ACS 4200) before TiedLowerACS (ACS 3500) on kill tie-breaker, got tiedHighIdx=%d, tiedLowIdx=%d", tiedHighIdx, tiedLowIdx)
+	}
+	if !(tiedLowIdx < highAcsLowKillsIdx) {
+		t.Errorf("expected TiedLowerACS (35 kills) before HighAcsLowKills (20 kills), got tiedLowIdx=%d, highAcsLowKillsIdx=%d", tiedLowIdx, highAcsLowKillsIdx)
+	}
+	if !(highAcsLowKillsIdx < selfIdx) {
+		t.Errorf("expected HighAcsLowKills (20 kills) before self (10 kills), got highAcsLowKillsIdx=%d, selfIdx=%d", highAcsLowKillsIdx, selfIdx)
+	}
+}
+
+func TestMatchesModelRoundTimelineUnderline(t *testing.T) {
+	details := &models.MatchDetails{
+		RoundResults: []models.RoundResult{
+			{RoundNum: 0, WinningTeam: "Blue"},
+		},
+	}
+
+	m := NewMatchesModel(nil, "spectator-puuid", nil, nil)
+	m.SetSize(80, 30)
+
+	timeline := m.renderRoundTimeline(details, "Blue")
+
+	lines := strings.Split(timeline, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected timeline to contain multiple lines, got:\n%s", timeline)
+	}
+	if !strings.Contains(lines[0], "ROUND TIMELINE") {
+		t.Errorf("expected first line to contain ROUND TIMELINE, got: %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "  ─") {
+		t.Errorf("expected second line to start with '  ─', got: %q", lines[1])
+	}
+}

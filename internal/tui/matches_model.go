@@ -237,27 +237,35 @@ func (m MatchesModel) renderDetailView() string {
 	sb.WriteString("    " + headerOutcome + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
 
-	myTeam := d.GetPlayerTeam(m.playerPUUID)
-	myTeamID := "Blue"
-	if myTeam != nil {
-		myTeamID = myTeam.TeamID
+	isDeathmatch := strings.EqualFold(item.QueueName, "Deathmatch") ||
+		(d != nil && strings.EqualFold(d.MatchInfo.QueueID, "deathmatch")) ||
+		(d != nil && strings.Contains(strings.ToLower(d.MatchInfo.GameMode), "deathmatch") && !strings.Contains(strings.ToLower(d.MatchInfo.GameMode), "hurm"))
+
+	if isDeathmatch {
+		sb.WriteString(m.renderDeathmatchTable(d))
+	} else {
+		myTeam := d.GetPlayerTeam(m.playerPUUID)
+		myTeamID := "Blue"
+		if myTeam != nil {
+			myTeamID = myTeam.TeamID
+		}
+
+		// Render Friendly Team
+		sb.WriteString(m.renderTeamTable(d, myTeamID, true))
+		sb.WriteString("\n")
+
+		// Render Opponent Team
+		oppTeam := d.GetOpponentTeam(myTeamID)
+		oppTeamID := "Red"
+		if oppTeam != nil {
+			oppTeamID = oppTeam.TeamID
+		}
+		sb.WriteString(m.renderTeamTable(d, oppTeamID, false))
+		sb.WriteString("\n")
+
+		// Render Round Timeline
+		sb.WriteString(m.renderRoundTimeline(d, myTeamID))
 	}
-
-	// Render Friendly Team
-	sb.WriteString(m.renderTeamTable(d, myTeamID, true))
-	sb.WriteString("\n")
-
-	// Render Opponent Team
-	oppTeam := d.GetOpponentTeam(myTeamID)
-	oppTeamID := "Red"
-	if oppTeam != nil {
-		oppTeamID = oppTeam.TeamID
-	}
-	sb.WriteString(m.renderTeamTable(d, oppTeamID, false))
-	sb.WriteString("\n")
-
-	// Render Round Timeline
-	sb.WriteString(m.renderRoundTimeline(d, myTeamID))
 
 	sb.WriteString("\n\n  " + RenderKeyItem("esc", "return to match list"))
 
@@ -367,13 +375,89 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 	return sb.String()
 }
 
+func (m MatchesModel) renderDeathmatchTable(d *models.MatchDetails) string {
+	var sb strings.Builder
+
+	headerRow := fmt.Sprintf("  %-18s  %-9s  %3s %3s %3s",
+		"Player", "Agent", "K", "D", "A")
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow) + "\n")
+	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
+
+	type dmPlayerRow struct {
+		player models.MatchPlayer
+		acs    int
+		name   string
+		agent  string
+	}
+
+	var rows []dmPlayerRow
+	for _, p := range d.Players {
+		name := ""
+		if p.Subject == m.playerPUUID {
+			name = "▸ You"
+		} else if p.GameName != "" {
+			if p.TagLine != "" {
+				name = fmt.Sprintf("%s#%s", p.GameName, p.TagLine)
+			} else {
+				name = p.GameName
+			}
+		} else {
+			name = "<Hidden>"
+		}
+
+		agentName := "Agent"
+		if m.agentsMap != nil {
+			if a, ok := m.agentsMap[strings.ToLower(p.CharacterID)]; ok {
+				agentName = a
+			}
+		}
+
+		acs, _, _, _ := d.ComputePlayerAdvancedStats(p.Subject)
+		rows = append(rows, dmPlayerRow{
+			player: p,
+			acs:    acs,
+			name:   name,
+			agent:  agentName,
+		})
+	}
+
+	// Sort descending by Kills; tie-breaker descending ACS; then ascending deaths; then descending assists
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].player.Stats.Kills != rows[j].player.Stats.Kills {
+			return rows[i].player.Stats.Kills > rows[j].player.Stats.Kills
+		}
+		if rows[i].acs != rows[j].acs {
+			return rows[i].acs > rows[j].acs
+		}
+		if rows[i].player.Stats.Deaths != rows[j].player.Stats.Deaths {
+			return rows[i].player.Stats.Deaths < rows[j].player.Stats.Deaths
+		}
+		return rows[i].player.Stats.Assists > rows[j].player.Stats.Assists
+	})
+
+	for _, row := range rows {
+		p := row.player
+		playerRow := fmt.Sprintf("  %s  %s  %3d %3d %3d",
+			fitWidth(row.name, 18),
+			fitWidth(row.agent, 9),
+			p.Stats.Kills, p.Stats.Deaths, p.Stats.Assists,
+		)
+
+		if p.Subject == m.playerPUUID {
+			playerRow = lipgloss.NewStyle().Foreground(ColorUltra).Bold(true).Render(playerRow)
+		}
+		sb.WriteString(playerRow + "\n")
+	}
+	return sb.String()
+}
+
 func (m MatchesModel) renderRoundTimeline(d *models.MatchDetails, myTeamID string) string {
 	if len(d.RoundResults) == 0 {
 		return ""
 	}
 
 	var sb strings.Builder
-	sb.WriteString(lipgloss.NewStyle().Foreground(ColorFg).Bold(true).Render("  ROUND TIMELINE\n"))
+	sb.WriteString(lipgloss.NewStyle().Foreground(ColorFg).Bold(true).Render("  ROUND TIMELINE") + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n  ")
 
 	for i, r := range d.RoundResults {
