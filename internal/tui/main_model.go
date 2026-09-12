@@ -79,6 +79,15 @@ type BattlepassData struct {
 // RefreshMsg triggers a data reload.
 type RefreshMsg struct{}
 
+// pollTickMsg is sent every 30 seconds to trigger silent background polling.
+type pollTickMsg struct{}
+
+// SilentMatchesLoadedMsg carries silently-fetched match data without triggering loading state.
+type SilentMatchesLoadedMsg struct {
+	MatchDetails []*models.MatchDetails
+	CompUpdates  *models.CompetitiveUpdatesResponse
+}
+
 // ── MainModel ───────────────────────────────────────────────────────
 
 type MainModel struct {
@@ -146,7 +155,16 @@ func (m MainModel) Init() tea.Cmd {
 	if m.needsRegion {
 		return m.regionModel.Init()
 	}
-	return func() tea.Msg { return RefreshMsg{} }
+	return tea.Batch(
+		func() tea.Msg { return RefreshMsg{} },
+		pollTickCmd(),
+	)
+}
+
+func pollTickCmd() tea.Cmd {
+	return tea.Tick(30*time.Second, func(_ time.Time) tea.Msg {
+		return pollTickMsg{}
+	})
 }
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -236,7 +254,48 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.ClearScreen
 		case "5":
 			m.activeTab = TabSession
-			return m, tea.ClearScreen
+			return m, tea.Batch(tea.ClearScreen, m.silentBackgroundPoll)
+		}
+
+		// Session-specific keys
+		if m.activeTab == TabSession {
+			switch msg.String() {
+			case "m", "M":
+				newMode := m.sessionModel.ToggleFilterMode()
+				go func() {
+					sd := &cache.SessionData{
+						PlayerPUUID:        m.session.PUUID,
+						SessionStartMillis: m.sessionModel.startTime.UnixMilli(),
+						LastActiveMillis:   time.Now().UnixMilli(),
+						InitialMatchIDs:    sessionModelMatchIDSlice(m.sessionModel),
+						FilterMode:         int(newMode),
+					}
+					_ = cache.SaveSession(sd)
+				}()
+				return m, nil
+			case "x", "X":
+				var currentIDs []string
+				for _, d := range m.sessionModel.allSessionMatches {
+					if d != nil {
+						currentIDs = append(currentIDs, d.MatchInfo.MatchID)
+					}
+				}
+				for id := range m.sessionModel.initialMatchIDs {
+					currentIDs = append(currentIDs, id)
+				}
+				m.sessionModel.ResetSession(currentIDs)
+				go func() {
+					sd := &cache.SessionData{
+						PlayerPUUID:        m.session.PUUID,
+						SessionStartMillis: m.sessionModel.startTime.UnixMilli(),
+						LastActiveMillis:   time.Now().UnixMilli(),
+						InitialMatchIDs:    currentIDs,
+						FilterMode:         int(m.sessionModel.filterMode),
+					}
+					_ = cache.SaveSession(sd)
+				}()
+				return m, nil
+			}
 		}
 
 		// Store sub-tab navigation
@@ -261,6 +320,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case RefreshMsg:
 		m.loading = true
 		return m, m.loadData
+
+	case pollTickMsg:
+		// Re-schedule next tick and silently poll if on relevant tab
+		cmds := []tea.Cmd{pollTickCmd()}
+		if m.activeTab == TabSession || m.activeTab == TabMatches {
+			cmds = append(cmds, m.silentBackgroundPoll)
+		}
+		return m, tea.Batch(cmds...)
+
+	case SilentMatchesLoadedMsg:
+		// Never set m.loading or m.err — silent resilience
+		m.sessionModel.UpdateSessionMatches(msg.MatchDetails)
+		if msg.CompUpdates != nil {
+			m.sessionModel.SetCompetitiveUpdates(msg.CompUpdates)
+		}
+		return m, nil
 
 	case DataLoadedMsg:
 		m.loading = false
@@ -319,13 +394,73 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.progressModel.SetSize(m.width, contentHeight)
 		m.bpModel = m.progressModel
 
+		// ── Intelligent Session Initialization ──────────────────────
+		// Collect all current match IDs for snapshot
 		var matchIDs []string
 		for _, it := range msg.MatchItems {
 			matchIDs = append(matchIDs, it.MatchID)
 		}
-		m.sessionModel.SetInitialSnapshot(matchIDs)
+
+		// Try to load persisted session
+		persistedSession, _ := cache.LoadSession()
+		sessionInitialized := false
+
+		if persistedSession != nil && persistedSession.PlayerPUUID == m.session.PUUID {
+			lastActive := time.UnixMilli(persistedSession.LastActiveMillis)
+			if time.Since(lastActive) < cache.SessionInactivityThreshold {
+				// Continue previous session
+				sessionStart := time.UnixMilli(persistedSession.SessionStartMillis)
+				m.sessionModel.SetSessionAnchor(
+					sessionStart,
+					persistedSession.InitialMatchIDs,
+					SessionFilterMode(persistedSession.FilterMode),
+				)
+				sessionInitialized = true
+			}
+		}
+
+		if !sessionInitialized {
+			// Fresh session: anchor to first match played today (since midnight), or now
+			now := time.Now()
+			midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+			sessionStart := now
+			for _, d := range msg.MatchDetails {
+				if d == nil {
+					continue
+				}
+				if d.MatchInfo.GameStartMillis > 0 {
+					mt := time.UnixMilli(d.MatchInfo.GameStartMillis)
+					if mt.After(midnight) && mt.Before(sessionStart) {
+						sessionStart = mt
+					}
+				}
+			}
+			m.sessionModel.SetSessionAnchor(sessionStart, matchIDs, FilterModeCompetitive)
+		}
+
 		m.sessionModel.UpdateSessionMatches(msg.MatchDetails)
+		m.sessionModel.SetCompetitiveUpdates(msg.CompUpdates)
+
+		// Set rank info
+		if msg.MMR != nil {
+			tier, rr := msg.MMR.GetCurrentCompetitiveInfo()
+			m.sessionModel.SetRankInfo(msg.RankName, tier, rr)
+		}
+		m.sessionModel.SetMetadataMaps(msg.AgentsMap, msg.MapsMap)
 		m.sessionModel.SetSize(m.width, contentHeight)
+
+		// Persist the (possibly new) session state
+		go func() {
+			sd := &cache.SessionData{
+				PlayerPUUID:        m.session.PUUID,
+				SessionStartMillis: m.sessionModel.startTime.UnixMilli(),
+				LastActiveMillis:   time.Now().UnixMilli(),
+				InitialMatchIDs:    sessionModelMatchIDSlice(m.sessionModel),
+				FilterMode:         int(m.sessionModel.filterMode),
+			}
+			_ = cache.SaveSession(sd)
+		}()
+
 		return m, nil
 	}
 
@@ -674,7 +809,7 @@ func (m MainModel) loadData() tea.Msg {
 	// 6. Fetch Match History
 	go func() {
 		defer wg.Done()
-		matchHist, _ = client.FetchMatchHistory(0, 10, "")
+		matchHist, _ = client.FetchMatchHistory(0, 20, "")
 	}()
 
 	// 7. Fetch Competitive Updates
@@ -805,7 +940,7 @@ func (m MainModel) loadData() tea.Msg {
 	var matchItems []MatchItem
 
 	if matchHist != nil && len(matchHist.History) > 0 {
-		limit := min(len(matchHist.History), 10)
+		limit := min(len(matchHist.History), 20)
 		detailChan := make(chan *models.MatchDetails, limit)
 		var detailWg sync.WaitGroup
 
@@ -930,4 +1065,54 @@ func (m MainModel) loadData() tea.Msg {
 		RanksMap:      ranksMap,
 		AllSkins:      skins,
 	}
+}
+
+// silentBackgroundPoll fetches match history and competitive updates silently
+// (never sets m.loading or m.err on failure).
+func (m MainModel) silentBackgroundPoll() tea.Msg {
+	client := api.NewClient(m.session)
+
+	matchHist, err := client.FetchMatchHistory(0, 20, "")
+	if err != nil || matchHist == nil {
+		return SilentMatchesLoadedMsg{}
+	}
+
+	limit := min(len(matchHist.History), 20)
+	detailChan := make(chan *models.MatchDetails, limit)
+	var wg sync.WaitGroup
+
+	for i := 0; i < limit; i++ {
+		wg.Add(1)
+		go func(mID string) {
+			defer wg.Done()
+			d, dErr := client.FetchMatchDetails(mID)
+			if dErr == nil && d != nil {
+				detailChan <- d
+			}
+		}(matchHist.History[i].MatchID)
+	}
+
+	wg.Wait()
+	close(detailChan)
+
+	var details []*models.MatchDetails
+	for d := range detailChan {
+		details = append(details, d)
+	}
+
+	compUpdates, _ := client.FetchCompetitiveUpdates(0, 20)
+	return SilentMatchesLoadedMsg{
+		MatchDetails: details,
+		CompUpdates:  compUpdates,
+	}
+}
+
+// sessionModelMatchIDSlice returns a flat slice of all match IDs known to the session
+// (initial snapshot + new session matches) for persistence.
+func sessionModelMatchIDSlice(sm SessionModel) []string {
+	var ids []string
+	for id := range sm.initialMatchIDs {
+		ids = append(ids, id)
+	}
+	return ids
 }

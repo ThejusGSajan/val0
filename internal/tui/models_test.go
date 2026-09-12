@@ -605,7 +605,7 @@ func TestSessionModel(t *testing.T) {
 
 	// Add a new session match
 	newMatch := &models.MatchDetails{
-		MatchInfo: models.MatchInfo{MatchID: "new-match-3", MapID: "Ascent"},
+		MatchInfo: models.MatchInfo{MatchID: "new-match-3", MapID: "Ascent", QueueID: "competitive"},
 		Players: []models.MatchPlayer{
 			{
 				Subject: puuid,
