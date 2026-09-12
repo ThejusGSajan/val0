@@ -81,9 +81,11 @@ func probeEnvironment() GraphicsProtocol {
 		return ProtocolITerm2
 	}
 
-	// 6. Windows Terminal (v1.22+ supports Sixel natively via ConPTY)
+	// 6. Windows Terminal: Default to ANSI Half-Blocks because ConPTY's cell buffer desynchronizes
+	// with Sixel DCS cursor jumping, causing horizontal raster clearing black bars.
+	// Users can still explicitly opt-in to Sixel via VAL0_GRAPHICS=sixel.
 	if os.Getenv("WT_SESSION") != "" {
-		return ProtocolSixel
+		return ProtocolHalfBlock
 	}
 
 	// 7. Sixel-capable TERM names

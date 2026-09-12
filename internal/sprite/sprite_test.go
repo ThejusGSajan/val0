@@ -62,6 +62,10 @@ func TestRenderSixelEncoding(t *testing.T) {
 	if len(sixelStr) == 0 || !strings.Contains(sixelStr, "\x1bP") {
 		t.Errorf("expected Sixel DCS escape sequence, got %q", sixelStr)
 	}
+	expectedHeader := "\x1bP0;1;8q\"1;1;8;8"
+	if !strings.Contains(sixelStr, expectedHeader) {
+		t.Errorf("expected Sixel DCS header %q, got: %q", expectedHeader, sixelStr[:min(len(sixelStr), 30)])
+	}
 }
 
 func TestRenderKittyEncoding(t *testing.T) {

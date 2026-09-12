@@ -71,18 +71,11 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 
 	var result string
 	if proto != ProtocolHalfBlock {
-		// Canvas pixel dimensions for native graphics protocols (Sixel, Kitty, iTerm2).
-		//
-		// Width: 8px per column is a safe lower bound for cell width across terminals.
-		// Height: 8px per row, rounded DOWN to the nearest multiple of 6 (Sixel band height).
-		// This ensures the Sixel output never exceeds targetRows on terminals with
-		// cell heights as small as 8px. On terminals with larger cells (e.g., 20px),
-		// the image will be proportionally smaller but correctly contained.
-		targetPixelWidth := widthCols * 8
-		targetPixelHeight := (targetRows * 8 / 6) * 6
-		if targetPixelHeight < 6 {
-			targetPixelHeight = 6
-		}
+		// Standard terminal monospace font cells measure ~10px wide by ~20px tall.
+		const cellW = 10
+		const cellH = 20
+		targetPixelWidth := widthCols * cellW
+		targetPixelHeight := targetRows * cellH
 
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
@@ -150,8 +143,13 @@ func fetchImage(url string) (image.Image, error) {
 }
 
 func renderHalfBlocks(img image.Image, targetWidth, targetRows int) string {
+	// Inset wide weapons by 4 columns so they never touch card borders
+	effectiveWidth := targetWidth - 4
+	if effectiveWidth < 12 {
+		effectiveWidth = targetWidth
+	}
 	maxH := targetRows * 2
-	resized := resize.Thumbnail(uint(targetWidth), uint(maxH), img, resize.Lanczos3)
+	resized := resize.Thumbnail(uint(effectiveWidth), uint(maxH), img, resize.Lanczos3)
 	bounds := resized.Bounds()
 	w := bounds.Dx()
 	h := bounds.Dy()

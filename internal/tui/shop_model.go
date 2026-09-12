@@ -151,7 +151,7 @@ func (m ShopModel) View() string {
 		gridRowLines := strings.Split(gridRow, "\n")
 		totalLines := len(gridRowLines)
 
-		// The card structure: top border (1) + wishlist header (1) + sprite rows (4) + spacer (1) + name (1) + rarity (1) + price (1) + bottom border (1) = 11 lines
+		// The card structure: top border (1) + wishlist header (1) + sprite rows (5) + name (1) + rarity (1) + price (1) + bottom border (1) = 11 lines
 		// Sprite row 0 starts at line index 2.
 		// linesUp from last line (totalLines - 1) to sprite row 0 (line 2) = totalLines - 3
 		linesUp := totalLines - 3
@@ -241,7 +241,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 	if renderTargetURL == "" {
 		renderTargetURL = skin.IconURL
 	}
-	const spriteTargetRows = 4 // fixed height for all sprite containers
+	const spriteTargetRows = 5 // fixed height for all sprite containers
 	spriteRenderWidth := cardContentWidth - 4 // 2-col margin on each side to prevent border collision
 	if spriteRenderWidth < 16 {
 		spriteRenderWidth = 16
@@ -255,7 +255,7 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 	var overlay *SpriteOverlay
 	isNative := strings.Contains(spr, "\x1bP") || strings.Contains(spr, "\x1b_G") || strings.Contains(spr, "\x1b]1337")
 	if isNative {
-		// Post-Border Overlay: Output 4 clean background-styled lines to Lipgloss
+		// Post-Border Overlay: Output 5 clean background-styled lines to Lipgloss
 		emptySpriteLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth))
 		for i := 0; i < spriteTargetRows; i++ {
 			content.WriteString(emptySpriteLine + "\n")
@@ -272,11 +272,6 @@ func renderSkinCardWithWishlist(skin models.ResolvedSkin, discountPct int, cardC
 		spr = padSpriteToHeight(spr, spriteTargetRows, cardContentWidth, string(ColorBg))
 		content.WriteString(spr + "\n")
 	}
-
-	// Spacer line: absorbs any native graphics (Sixel) vertical overflow
-	// that might bleed past the sprite area. Prevents sprite from overwriting the name line.
-	content.WriteString(lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", cardContentWidth)))
-	content.WriteString("\n")
 
 	// Line 6: Skin name
 	content.WriteString(nameStyle.Render(truncate(skin.DisplayName, cardContentWidth)))
