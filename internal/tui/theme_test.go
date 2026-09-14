@@ -61,6 +61,9 @@ func TestKeyLegendRenderers(t *testing.T) {
 }
 
 func TestColorPaletteConstraints(t *testing.T) {
+	if ColorBg != lipgloss.Color("#0D0F17") {
+		t.Fatalf("expected ColorBg to be #0D0F17, got: %v", ColorBg)
+	}
 	if ColorAccent != lipgloss.Color("#EC666D") {
 		t.Fatalf("expected ColorAccent to be #EC666D, got: %v", ColorAccent)
 	}

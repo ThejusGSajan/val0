@@ -26,6 +26,12 @@ func TestRenderHalfBlocks(t *testing.T) {
 	if !strings.Contains(result, "▀") {
 		t.Errorf("expected rendered output to contain '▀', got: %s", result)
 	}
+	if !strings.Contains(result, "\x1b[48;2;13;15;23m") {
+		t.Errorf("expected rendered output to contain #0D0F17 background sequence, got: %s", result)
+	}
+	if strings.Contains(result, "\x1b[48;2;15;17;23m") {
+		t.Errorf("rendered output contains obsolete #0F1117 background sequence")
+	}
 
 	lines := strings.Split(strings.TrimSpace(result), "\n")
 	if len(lines) != 2 {

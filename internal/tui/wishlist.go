@@ -387,7 +387,7 @@ func (m WishlistModel) View() string {
 		// Pad the list to maxBrDisplay rows, explicitly painting the background color
 		// so it doesn't default to the terminal's pure black.
 		for i := len(listRows); i < 8; i++ {
-			styledEmptyLine := lipgloss.NewStyle().Background(lipgloss.Color("#0F1117")).Render(strings.Repeat(" ", listWidth))
+			styledEmptyLine := lipgloss.NewStyle().Background(ColorBg).Render(strings.Repeat(" ", listWidth))
 			listRows = append(listRows, styledEmptyLine)
 		}
 	}
@@ -485,7 +485,7 @@ func (m WishlistModel) View() string {
 		// Shop v26 trailing wipe on the bottom line after \x1b8 cursor restore
 		totalSplitViewWidth := lipgloss.Width(splitView)
 		wipeCols := 120
-		trailingWipe := fmt.Sprintf("\x1b[48;2;15;17;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalSplitViewWidth+1)
+		trailingWipe := fmt.Sprintf("\x1b[48;2;13;15;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalSplitViewWidth+1)
 
 		// Zero-width OSC invalidator token to prevent Bubble Tea line-diff suppression during search typing
 		invalidator := fmt.Sprintf("\x1b]999;wl=%s;%d;%d;%d;%s\x07", m.searchInput, m.brCursor, m.wlCursor, m.focusSection, m.flashMsg)

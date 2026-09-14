@@ -19,7 +19,7 @@ var (
 
 	ColorMuted     = lipgloss.Color("#6B7280")
 	ColorFg        = lipgloss.Color("#E5E7EB")
-	ColorBg        = lipgloss.Color("#0F1117")
+	ColorBg        = lipgloss.Color("#0D0F17")
 	ColorAccent    = lipgloss.Color("#EC666D") // val0 Coral/Rose theme
 	ColorBorder    = lipgloss.Color("#2A2D37")
 	ColorTabActive = lipgloss.Color("#EC666D")
@@ -55,7 +55,7 @@ var RarityNameMap = map[string]string{
 var (
 	// App frame
 	AppStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#0F1117")).
+			Background(ColorBg).
 			Foreground(ColorFg)
 
 	// Header / title bar

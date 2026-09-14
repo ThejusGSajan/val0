@@ -80,9 +80,16 @@ func Render(iconURL string, widthCols int, targetRows int) string {
 		// Resize preserving aspect ratio to fit inside bounding box
 		resized := resize.Thumbnail(uint(targetPixelWidth), uint(targetPixelHeight), img, resize.Lanczos3)
 
-		// Create Solid #0F1117 Background Canvas (Pre-composited to prevent terminal black-bar fallback)
+		// Create Solid #0D0F17 Background Canvas (Pre-composited to prevent terminal black-bar fallback)
 		canvas := image.NewRGBA(image.Rect(0, 0, targetPixelWidth, targetPixelHeight))
-		bgColor := color.RGBA{R: 15, G: 17, B: 23, A: 255}
+		bgColor := color.RGBA{R: 13, G: 15, B: 23, A: 255}
+		if proto == ProtocolSixel {
+			// Sixel quantizes 8-bit RGB to 0-100% via integer division (val * 100 / 255).
+			// For G=15: 15*100/255 = 5% -> decodes to 13 (0x0D), resulting in #0D0D17.
+			// Pre-compensating G to 17 (17*100/255 = 6% -> decodes to 15 / 0x0F)
+			// ensures the terminal decodes (5%, 6%, 9%) back to exact #0D0F17 (13, 15, 23).
+			bgColor = color.RGBA{R: 15, G: 17, B: 23, A: 255}
+		}
 		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: bgColor}, image.Point{}, draw.Src)
 
 		// Center the resized weapon onto the canvas with alpha blending
@@ -162,7 +169,7 @@ func renderHalfBlocks(img image.Image, targetWidth, targetRows int) string {
 	var renderedRows []string
 	for y := 0; y < h; y += 2 {
 		var sb strings.Builder
-		sb.WriteString("\x1b[48;2;15;17;23m") // TrueColor ColorBg #0F1117
+		sb.WriteString("\x1b[48;2;13;15;23m") // TrueColor ColorBg #0D0F17
 		sb.WriteString(leftPadStr)
 		for x := 0; x < w; x++ {
 			r1, g1, b1, a1 := resized.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
@@ -175,11 +182,11 @@ func renderHalfBlocks(img image.Image, targetWidth, targetRows int) string {
 			}
 
 			if a1 < 32 && a2 < 32 {
-				sb.WriteString("\x1b[48;2;15;17;23m ")
+				sb.WriteString("\x1b[48;2;13;15;23m ")
 			} else if a1 < 32 {
-				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;15;17;23m▄", r2, g2, b2))
+				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;13;15;23m▄", r2, g2, b2))
 			} else if a2 < 32 {
-				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;15;17;23m▀", r1, g1, b1))
+				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;13;15;23m▀", r1, g1, b1))
 			} else {
 				sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀", r1, g1, b1, r2, g2, b2))
 			}
@@ -191,7 +198,7 @@ func renderHalfBlocks(img image.Image, targetWidth, targetRows int) string {
 
 	topPad := (targetRows - len(renderedRows)) / 2
 	bottomPad := targetRows - len(renderedRows) - topPad
-	bgEmptyLine := "\x1b[48;2;15;17;23m" + strings.Repeat(" ", targetWidth) + "\x1b[0m"
+	bgEmptyLine := "\x1b[48;2;13;15;23m" + strings.Repeat(" ", targetWidth) + "\x1b[0m"
 
 	var finalLines []string
 	for i := 0; i < topPad; i++ {

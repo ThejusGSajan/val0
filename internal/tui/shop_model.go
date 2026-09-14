@@ -22,7 +22,7 @@ type SpriteOverlay struct {
 
 // buildWipeSeq creates an in-band cell wipe sequence with absolute column positioning.
 func buildWipeSeq(colOffset, contentWidth, spriteRows int) string {
-	bgSpaces := fmt.Sprintf("\x1b[48;2;15;17;23m%s\x1b[0m", strings.Repeat(" ", contentWidth))
+	bgSpaces := fmt.Sprintf("\x1b[48;2;13;15;23m%s\x1b[0m", strings.Repeat(" ", contentWidth))
 	var sb strings.Builder
 	for i := 0; i < spriteRows; i++ {
 		sb.WriteString(fmt.Sprintf("\x1b[%dG", colOffset+1)) // Absolute column (1-indexed)
@@ -173,7 +173,7 @@ func (m ShopModel) View() string {
 			totalGridRowWidth = (cardContentWidth+4)*2 + 1
 		}
 		wipeCols := 120
-		trailingWipe := fmt.Sprintf("\x1b[48;2;15;17;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalGridRowWidth+1)
+		trailingWipe := fmt.Sprintf("\x1b[48;2;13;15;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalGridRowWidth+1)
 
 		hasRightOverlay := rightCard != nil && rightCard.overlay != nil
 

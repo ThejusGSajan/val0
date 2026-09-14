@@ -111,7 +111,7 @@ func TestWishlist_SixelOverlayConstruction(t *testing.T) {
 	}
 
 	// 3. Verify Shop v26 trailingWipe
-	if !strings.Contains(injected, "\x1b[48;2;15;17;23m\x1b[K") {
+	if !strings.Contains(injected, "\x1b[48;2;13;15;23m\x1b[K") {
 		t.Errorf("expected Sixel payload to contain Shop v26 trailingWipe sequence")
 	}
 
