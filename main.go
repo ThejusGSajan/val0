@@ -11,15 +11,28 @@ import (
 	"github.com/val-tracker/val-tracker/internal/tui"
 )
 
+var (
+	Version   = "dev"
+	Commit    = "none"
+	BuildDate = "unknown"
+)
+
 func main() {
+	// CLI Flag Parser
+	graphicsFlag := flag.String("graphics", "", "Force graphics protocol: sixel, kitty, iterm2, halfblock")
+	versionFlag := flag.Bool("version", false, "Print version and build information")
+	vFlag := flag.Bool("v", false, "Print version and build information (shorthand)")
+	flag.Parse()
+
+	if *versionFlag || *vFlag {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
 	// Relaunch in Windows Terminal if double-clicked from Explorer
 	if launcher.IsStandaloneConhost() {
 		launcher.TryRelaunchInWT(os.Args[1:])
 	}
-
-	// CLI Flag Parser
-	graphicsFlag := flag.String("graphics", "", "Force graphics protocol: sixel, kitty, iterm2, halfblock")
-	flag.Parse()
 
 	if *graphicsFlag != "" {
 		// Overwrite the environment variable so detect.go naturally picks it up
@@ -32,3 +45,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+

@@ -1,6 +1,6 @@
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%20Only-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/val-tracker/val-tracker)
+[![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue.svg?style=flat-square)](LICENSE)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%20Only-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/ThejusGSajan/val0)
 
 ```text
 ██╗   ██╗ █████╗ ██╗      ██████╗ 
@@ -13,29 +13,26 @@
 
 > Terminal UI dashboard for Valorant
 
-`val0` started as a fifty-line script to grab the skins from the store without loading up the entire game. Then, since nothing stays a fifty-line script for long, it grew past its original scope into a store fetcher with a wishlist mechanism, detailed match history, stats, BP and mission progress trackers, and a session tracker (why not, at that point), all without needing Electron, a browser tab, or a couple hundred MB of memory to show some text and images.
-
-
-
+`val0` started as a fifty-line script to grab the skins from the store without loading up the entire game. Then, since nothing stays a fifty-line script for long, it grew past its original scope into a store fetcher with a wishlist mechanism, detailed match history, stats, BP and mission progress trackers, and a session tracker (cus why not, at that point), all without needing Electron, a browser tab, or a couple hundred MB of memory to show some text and images.
 
 ## Core Features
 
 ### 1. Store & Wishlist (`[1] Store`)
-- **Daily Rotating Storefront (`[s] Shop`)**: View your 4 daily weapon skin offers rendered in a 2x2 grid with live countdown timers (`⏱ Resets in Xh Ym`) indicating when the store refreshes.
+- **Daily Rotating Storefront (`[s] Shop`)**: View your 4 daily weapon skin offers.
 - **Wishlist Match Alert**: Highlights matching daily store drops with an immediate alert banner (`⭐ WISHLIST MATCH!`) so you never miss a desired skin.
 - **Skin Wishlist & Catalog Search (`[w] Wishlist`)**: A split-view manager displaying your active wishlist on top and a searchable catalog on the bottom. Features real-time as-you-type search filtering, live right-pane graphic preview sprites of highlighted skins, and one-key addition (`Enter`) or removal (`x` / `Delete`).
 - **Night Market Integration (`[n] Night Market`)**: Dynamically unlocks when the Night Market event is active, presenting all 6 discounted offers, custom calculated discount percentages, and original vs. discounted VP pricing.
 - **Terminal Graphic Previews**: High-performance skin sprite rendering using Sixel graphics (supported natively in Windows Terminal v1.22+ and modern terminal emulators) or high-density Unicode half-block ANSI fallbacks.
 
-### 2. Match History & Deep Scoreboard (`[2] Matches`)
-- **Recent Matches Overview**: Chronological list of your last 20 matches across all game modes (Competitive, Unrated, Swiftplay, Spike Rush, Deathmatch, Team Deathmatch, Escalation, and Custom games).
+### 2. Match History & Scoreboard (`[2] Matches`)
+- **Recent Matches Overview**: Chronological list of your last 20 matches across all game modes.
 - **Match Summary Badges**: Immediate visual indicators for outcome (`WIN`, `LOSS`, `DRAW`), map name, queue type, agent played, final round score, K/D/A ratio, Ranked Rating delta (`+/- RR` for competitive games), and relative match age.
-- **Deep Match Scoreboard (`Enter`)**: Drill into any match to view the complete 10-player scoreboard split into friendly and enemy teams (or unified leaderboard for Deathmatch).
+- **Detailed Match Scoreboard (`Enter`)**: Drill into any match to view the complete 10-player scoreboard split into friendly and enemy teams (or unified leaderboard for Deathmatch).
 - **In-Depth Performance Breakdown**: Tracks ACS, Kills, Deaths, Assists, Headshot %, Average Damage per Round (ADR), Econ rating, and a round-by-round win/loss timeline (`■`/`□`).
 
 ### 3. Performance Analytics & Weapon Mastery (`[3] Stats`)
-- **Agent Performance Metrics**: Aggregated performance statistics across all played agents in tactical modes (automatically filters out Deathmatch and casual arcade modes for accurate combat averages). Tracks games played, win rate %, K/D ratio, ACS, ADR, and Headshot %.
-- **Weapon Mastery Statistics**: Detailed kill breakdown for your top 6 weapons, including hit distribution percentages (precision headshot, bodyshot, and legshot accuracy).
+- **Agent Performance Metrics**: Aggregated performance statistics across all played agents in tactical modes (automatically filters out Deathmatch and other casual arcade modes for accurate combat averages). Tracks games played, win rate %, K/D ratio, ACS, ADR, and Headshot %.
+- **Weapon Mastery Statistics**: Detailed kill breakdown for your top 6 weapons ranked by total eliminations across recent matches.
 - **Ranked Rating Trend Sparkline**: Chronological signed sparkline (`▲`/`▼`/`─`) tracking competitive rating fluctuations across recent matches, accompanied by your current competitive rank badge and aggregate Net RR earned.
 
 ### 4. Battlepass & Active Missions (`[4] Progress`)
@@ -87,16 +84,16 @@
 
 ### Installation
 
-#### Pre-built Binaries (Windows x64 / ARM64)
-Download the latest `val0.exe` from the GitHub Releases page and place it anywhere in your Windows `PATH` (or double-click to launch).
+#### Pre-built Binary (Windows x64)
+Download the latest `val0.exe` from the [GitHub Releases page](https://github.com/ThejusGSajan/val0/releases) and place it anywhere in your Windows `PATH` (or double-click to launch).
 
 #### Building from Source
 Prerequisites: **Go 1.22** or later installed on Windows.
 
 ```powershell
 # Clone the repository
-git clone https://github.com/val-tracker/val-tracker.git
-cd val-tracker
+git clone https://github.com/ThejusGSajan/val0.git
+cd val0
 
 # Compile the Windows binary
 go build -o val0.exe .
@@ -137,10 +134,10 @@ go build -o val0.exe .
 | | `Enter` | Add selected skin to wishlist |
 | | `Esc` | Return focus to Wishlist list |
 | **Match History** | `j` / `k` or `Down` / `Up` | Scroll through recent match list |
-| | `Enter` | Open Deep Match Scoreboard for selected match |
+| | `Enter` | Open Detailed Match Scoreboard for selected match |
 | | `Esc` / `Backspace` / `Left` | Return from Scoreboard to Match List |
 | **Performance Stats** | `j` / `k` or `Down` / `Up` / `s` / `w` | Scroll down / up through performance metrics |
-| **Session Tracker** | `m` | Toggle mode filter (`Competitive Only` vs `All Modes`) |
+| **Session Tracker** | `m` | Toggle mode filter (`Competitive Only` vs `Comp + Unrated + Swiftplay + Spike Rush`) |
 | | `x` | Reset active session tracking |
 | | `j` / `k` or `Down` / `Up` | Scroll through session match breakdown table |
 
@@ -153,14 +150,15 @@ go build -o val0.exe .
 
 | Flag / Variable | Options | Description |
 |:---|:---|:---|
-| `--graphics <proto>` | `sixel`, `kitty`, `halfblock`, `none` | CLI flag to force a specific rendering protocol |
-| `VAL0_GRAPHICS` | `sixel`, `kitty`, `halfblock`, `none` | Environment variable equivalent |
+| `--graphics <proto>` | `sixel`, `kitty`, `iterm2`, `halfblock`, `none` | CLI flag to force a specific rendering protocol |
+| `VAL0_GRAPHICS` | `sixel`, `kitty`, `iterm2`, `halfblock`, `none` | Environment variable equivalent |
 
 ### Local Storage Paths
 All persistent configuration and cache files reside in standard Windows AppData:
 - `%APPDATA%\val-tracker\wishlist.json`: Saved skin wishlist entries.
 - `%APPDATA%\val-tracker\session.json`: Active session baseline and match tracking data.
-- `%APPDATA%\val-tracker\skins.json`: Cached weapon skin asset metadata (automatically validated against remote client versions).
+- `%APPDATA%\val-tracker\prices.json`: Persisted skin VP pricing database recorded from live storefronts.
+- `%APPDATA%\val-tracker\*.json`: Cached Riot & valorant-api.com metadata (`skins`, `weapons`, `agents`, `maps`, `ranks`, `contracts`, `missions`), automatically invalidated when client patch version changes.
 
 ---
 
@@ -170,16 +168,17 @@ All persistent configuration and cache files reside in standard Windows AppData:
 |:---|:---|:---|
 | **Local Client** | `GET https://127.0.0.1:<port>/entitlements/v1/token` | Access Bearer token, Entitlements JWT, and player PUUID |
 | **Local Client** | `GET https://127.0.0.1:<port>/product-session/v1/external-sessions` | Local process metadata for deployment/shard auto-detection |
-| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/store/v2/storefront/{puuid}` | Daily rotating store offers and Night Market offers |
+| **Remote Riot PVP** | `POST https://pd.<shard>.a.pvp.net/store/v3/storefront/{puuid}` | Daily rotating store offers and Night Market offers (payload: `{}`) |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/store/v1/wallet/{puuid}` | Player balances (Valorant Points, Radianite, Kingdom Credits) |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/match-history/v1/history/{puuid}` | Recent match history list and match IDs |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/match-details/v1/matches/{matchId}` | Comprehensive 10-player match scoreboard, economy, and rounds |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/mmr/v1/players/{puuid}/competitiveupdates` | Ranked Rating (RR) delta history and tier movements |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/mmr/v1/players/{puuid}` | Current competitive rank, seasonal MMR, and tier progress |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/contracts/v1/contracts/{puuid}` | Active battlepass tier progression and mission progress |
-| **Remote Riot PVP** | `PUT https://pd.<shard>.a.pvp.net/name-service/v2/players` | Shard liveness probe and validation |
-| **Static Assets** | `GET https://valorant-api.com/v1/weapons/skins` | Weapon skin names, rarity tiers, and weapon icon sprites |
-| **Static Assets** | `GET https://valorant-api.com/v1/version` | Live client version metadata for cache invalidation |
+| **Remote Riot PVP** | `PUT https://pd.<shard>.a.pvp.net/name-service/v2/players` | Batch player name resolution (`GameName#TagLine`) & shard probe |
+| **Remote Riot Shared** | `GET https://shared.<shard>.a.pvp.net/content-service/v3/content` | Active season, act IDs, and battlepass contract metadata |
+| **Riot Geo PAS** | `PUT https://riot-geo.pas.si.riotgames.com/pas/v1/product/valorant` | Shard and live region affinity discovery |
+| **Static Assets** | `GET https://valorant-api.com/v1/*` | Static game asset metadata (`skins`, `weapons`, `agents`, `maps`, `ranks`, `contracts`, `missions`, `version`) |
 
 ---
 
@@ -195,10 +194,10 @@ All persistent configuration and cache files reside in standard Windows AppData:
 ## Security & Legal Disclaimer
 
 ### Read-Only & Fair Use
-`val0` is an external diagnostic companion that interfaces exclusively with local loopback and standard HTTP endpoints. It does not inject code into the Valorant game process, does not inspect or manipulate game memory, does not modify game assets, and provides no tactical in-game advantages. It is safe to run alongside Riot Vanguard.
+`val0` is an external diagnostic companion that interfaces exclusively with local loopback and standard HTTP endpoints. It does not inject code into the Valorant game process, does not inspect or manipulate game memory, does not modify game assets, and provides no tactical in-game advantages nor does it interfere with Riot Vanguard.
 
 ### Trademark Notice
 `val0` is not affiliated with or endorsed by Riot Games, Inc. Valorant and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
 
 ### License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [AGPLv3 License](LICENSE).
