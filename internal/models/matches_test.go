@@ -268,3 +268,167 @@ func TestDeathmatchScoreStringAndOutcome(t *testing.T) {
 		t.Errorf("comp score = %s, want 13-7", score)
 	}
 }
+
+func TestIsCasualMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		details  *MatchDetails
+		expected bool
+	}{
+		{
+			name:     "Nil MatchDetails",
+			details:  nil,
+			expected: false,
+		},
+		{
+			name: "QueueID deathmatch",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "deathmatch"},
+			},
+			expected: true,
+		},
+		{
+			name: "QueueID Deathmatch uppercase",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "Deathmatch"},
+			},
+			expected: true,
+		},
+		{
+			name: "Deathmatch with empty QueueID and GameMode asset path",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "/Game/GameModes/Deathmatch/DeathmatchGameMode.DeathmatchGameMode_C",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "TDM Hurm in QueueID",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "hurm"},
+			},
+			expected: true,
+		},
+		{
+			name: "TDM Hurm in GameMode asset path",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "/Game/GameModes/Hurm/HurmGameMode.HurmGameMode_C",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Escalation in QueueID",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "ggteam"},
+			},
+			expected: true,
+		},
+		{
+			name: "Escalation in GameMode asset path",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "/Game/GameModes/GunGame/GGTeamGameMode.GGTeamGameMode_C",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Skirmish in QueueID",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "skirmish"},
+			},
+			expected: true,
+		},
+		{
+			name: "Skirmish in GameMode asset path",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "/Game/GameModes/Skirmish/SkirmishGameMode.SkirmishGameMode_C",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Snowball in QueueID",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "snowball"},
+			},
+			expected: true,
+		},
+		{
+			name: "Snowball in GameMode asset path",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "/Game/GameModes/Snowball/SnowballGameMode.SnowballGameMode_C",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Competitive",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "competitive",
+					GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Unrated",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "unrated",
+					GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Swiftplay",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "swiftplay",
+					GameMode: "/Game/GameModes/Swiftplay/SwiftplayGameMode.SwiftplayGameMode_C",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Spike Rush",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "spikerush",
+					GameMode: "/Game/GameModes/QuickBomb/QuickBombGameMode.QuickBombGameMode_C",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Mock tactical match without QueueID or GameMode",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{
+					QueueID:  "",
+					GameMode: "",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		got := tc.details.IsCasualMode()
+		if got != tc.expected {
+			t.Errorf("Test %s: IsCasualMode() = %v, want %v", tc.name, got, tc.expected)
+		}
+	}
+}
+

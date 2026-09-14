@@ -177,6 +177,29 @@ func (m *MatchDetails) IsDeathmatch() bool {
 	return queue == "deathmatch" || strings.Contains(mode, "deathmatch")
 }
 
+// IsCasualMode returns true if the match is a casual or non-structured mode
+// (Free-For-All Deathmatch, Team Deathmatch / Hurm, Escalation / GGTeam, Skirmish, or Snowball Fight)
+// which should not contribute to tactical/competitive agent performance metrics.
+func (m *MatchDetails) IsCasualMode() bool {
+	if m == nil {
+		return false
+	}
+	if m.IsDeathmatch() {
+		return true
+	}
+	queue := strings.ToLower(m.MatchInfo.QueueID)
+	mode := strings.ToLower(m.MatchInfo.GameMode)
+
+	casualIdentifiers := []string{"deathmatch", "hurm", "ggteam", "skirmish", "snowball"}
+	for _, id := range casualIdentifiers {
+		if queue == id || strings.Contains(mode, id) {
+			return true
+		}
+	}
+	return false
+}
+
+
 // FormatOrdinal returns the 1-based ordinal representation of a rank (e.g. 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11 -> "11th").
 func FormatOrdinal(n int) string {
 	if n <= 0 {

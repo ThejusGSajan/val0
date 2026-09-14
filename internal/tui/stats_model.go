@@ -46,6 +46,25 @@ type StatsModel struct {
 	height         int
 }
 
+// isExcludedStatsMatch determines if a match should be excluded from tactical stats
+// (e.g. FFA Deathmatch, Team Deathmatch, Escalation, Skirmish, Snowball Fight).
+// It checks the domain model IsCasualMode() and IsDeathmatch(), with a fallback
+// to ResolveQueueDisplayName in case QueueID was empty and GameMode was used.
+func isExcludedStatsMatch(md *models.MatchDetails) bool {
+	if md == nil {
+		return true
+	}
+	if md.IsCasualMode() || md.IsDeathmatch() {
+		return true
+	}
+	resolved := ResolveQueueDisplayName(md.MatchInfo.QueueID, md.MatchInfo.GameMode)
+	switch resolved {
+	case "Deathmatch", "Team Deathmatch", "Escalation", "Skirmish", "Snowball Fight":
+		return true
+	}
+	return false
+}
+
 func NewStatsModel(
 	matchDetails []*models.MatchDetails,
 	playerPUUID string,
@@ -59,17 +78,11 @@ func NewStatsModel(
 	var hsHistory []int
 
 	for _, md := range matchDetails {
-		if md == nil {
+		if md == nil || isExcludedStatsMatch(md) {
 			continue
 		}
 		player := md.GetPlayer(playerPUUID)
 		if player == nil {
-			continue
-		}
-
-		// Skip casual/non-structured modes — not meaningful for agent performance stats
-		queueID := strings.ToLower(md.MatchInfo.QueueID)
-		if queueID == "deathmatch" || queueID == "skirmish" || queueID == "hurm" || queueID == "ggteam" {
 			continue
 		}
 

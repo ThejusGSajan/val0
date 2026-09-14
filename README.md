@@ -1,8 +1,6 @@
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-informational?style=flat-square)](https://github.com/val-tracker/val-tracker)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/val-tracker/val-tracker/ci.yml?branch=main&style=flat-square)](https://github.com/val-tracker/val-tracker/actions)
-[![Release](https://img.shields.io/github/v/release/val-tracker/val-tracker?style=flat-square)](https://github.com/val-tracker/val-tracker/releases)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%20Only-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/val-tracker/val-tracker)
 
 ```text
 ██╗   ██╗ █████╗ ██╗      ██████╗ 
@@ -13,46 +11,50 @@
   ╚═══╝  ╚═╝  ╚═╝╚══════╝ ╚═════╝ 
 ```
 
-> No-nonsense terminal dashboard for Valorant
+> Terminal UI dashboard for Valorant
 
----
+`val0` started as a fifty-line script to grab the skins from the store without loading up the entire game. Then, since nothing stays a fifty-line script for long, it grew past its original scope into a store fetcher with a wishlist mechanism, detailed match history, stats, BP and mission progress trackers, and a session tracker (why not, at that point), all without needing Electron, a browser tab, or a couple hundred MB of memory to show some text and images.
 
-## Origin & Motivation
 
-Like many players, this project started out of a very simple daily friction: wanting to check what skins appeared in the daily rotating store or whether the Night Market had finally rolled something good, without having to launch the full game. Booting the heavy 3D game client, waiting through anti-cheat initialization, loading intro screens, and spinning up shaders just to check a shop timer felt unnecessary when you just wanted a quick glance from your desktop.
 
-What began as a tiny Go script to read local authentication tokens and query the storefront endpoint gradually expanded. First came high-resolution terminal skin previews, then a wishlist tracker to notify when favorite skins dropped, followed by match history inspection, round-by-round combat scoreboards, aggregate headshot analytics, and battlepass mission progression.
-
-`val0` is the result of that evolution: a lightweight, fast, keyboard-driven companion app built specifically for the terminal. It provides instant access to your stats, cosmetics, and match records in milliseconds while consuming negligible system resources.
-
----
 
 ## Core Features
 
-### 1. Store & Night Market
-- **Daily Storefront**: View your 4 daily rotating weapon offers alongside precise countdown timers until the next shop refresh.
-- **Terminal Graphics Previews**: Automatic weapon render previews utilizing Sixel, Kitty Graphics Protocol, iTerm2 Inline Images, or ANSI half-block rendering based on your terminal's capabilities.
-- **Night Market Integration**: When active, automatically populates the Night Market sub-view with custom discounted pricing and calculated percentage deductions.
-- **Local Skin Wishlist**: Browse the complete Valorant weapon skin catalog, search for desired cosmetics, add them to your local wishlist, and receive instant alert banners whenever a wishlisted item rotates into your daily shop.
+### 1. Store & Wishlist (`[1] Store`)
+- **Daily Rotating Storefront (`[s] Shop`)**: View your 4 daily weapon skin offers rendered in a 2x2 grid with live countdown timers (`⏱ Resets in Xh Ym`) indicating when the store refreshes.
+- **Wishlist Match Alert**: Highlights matching daily store drops with an immediate alert banner (`⭐ WISHLIST MATCH!`) so you never miss a desired skin.
+- **Skin Wishlist & Catalog Search (`[w] Wishlist`)**: A split-view manager displaying your active wishlist on top and a searchable catalog on the bottom. Features real-time as-you-type search filtering, live right-pane graphic preview sprites of highlighted skins, and one-key addition (`Enter`) or removal (`x` / `Delete`).
+- **Night Market Integration (`[n] Night Market`)**: Dynamically unlocks when the Night Market event is active, presenting all 6 discounted offers, custom calculated discount percentages, and original vs. discounted VP pricing.
+- **Terminal Graphic Previews**: High-performance skin sprite rendering using Sixel graphics (supported natively in Windows Terminal v1.22+ and modern terminal emulators) or high-density Unicode half-block ANSI fallbacks.
 
-### 2. Match History & Deep Scoreboard
-- **Match Overview**: Chronological list of recent competitive and casual matches displaying match outcome (WIN, LOSS, DRAW), map, agent played, final round score, K/D/A, and Ranked Rating (RR) delta.
-- **Deep Match Scoreboard**: Inspect any match with a single keystroke to view a complete 10-player scoreboard breakdown featuring Average Combat Score (ACS), K/D/A ratios, Average Damage per Round (ADR), Econ Rating, and round win distribution.
+### 2. Match History & Deep Scoreboard (`[2] Matches`)
+- **Recent Matches Overview**: Chronological list of your last 20 matches across all game modes (Competitive, Unrated, Swiftplay, Spike Rush, Deathmatch, Team Deathmatch, Escalation, and Custom games).
+- **Match Summary Badges**: Immediate visual indicators for outcome (`WIN`, `LOSS`, `DRAW`), map name, queue type, agent played, final round score, K/D/A ratio, Ranked Rating delta (`+/- RR` for competitive games), and relative match age.
+- **Deep Match Scoreboard (`Enter`)**: Drill into any match to view the complete 10-player scoreboard split into friendly and enemy teams (or unified leaderboard for Deathmatch).
+- **In-Depth Performance Breakdown**: Tracks ACS, Kills, Deaths, Assists, Headshot %, Average Damage per Round (ADR), Econ rating, and a round-by-round win/loss timeline (`■`/`□`).
 
-### 3. Performance Analytics & Sparklines
-- **Agent Performance Metrics**: Aggregated performance metrics across all played agents, including games played, win rate percentage, K/D, ACS, ADR, and Headshot percentage.
-- **Weapon Mastery Statistics**: Detailed breakdown of weapon kill distributions, including precision headshot, bodyshot, and legshot percentages.
-- **Trend Sparklines**: Real-time terminal sparklines visualizing match-by-match headshot accuracy trends and competitive Ranked Rating fluctuations over your recent match history.
+### 3. Performance Analytics & Weapon Mastery (`[3] Stats`)
+- **Agent Performance Metrics**: Aggregated performance statistics across all played agents in tactical modes (automatically filters out Deathmatch and casual arcade modes for accurate combat averages). Tracks games played, win rate %, K/D ratio, ACS, ADR, and Headshot %.
+- **Weapon Mastery Statistics**: Detailed kill breakdown for your top 6 weapons, including hit distribution percentages (precision headshot, bodyshot, and legshot accuracy).
+- **Ranked Rating Trend Sparkline**: Chronological signed sparkline (`▲`/`▼`/`─`) tracking competitive rating fluctuations across recent matches, accompanied by your current competitive rank badge and aggregate Net RR earned.
 
-### 4. Battlepass Progression & Active Missions
-- **Act Battlepass Tracker**: Visual tier progress bar indicating current tier, tier completion percentage, remaining XP required for the next unlock, and total accumulated XP.
-- **Active Mission Breakdown**: Real-time status of all active daily and weekly missions with individual progress indicators, target thresholds, and XP reward values.
+### 4. Battlepass & Active Missions (`[4] Progress`)
+- **Act Battlepass Tracker**: Visual tier progress bar displaying current tier, total tiers, overall act progression percentage, current tier XP progress (`XPInCurrentTier` / `XPForNextTier`), and total accumulated XP.
+- **Active Missions Breakdown**: Real-time status for all active daily and weekly mission contracts, displaying target objective progress bars, completion checkmarks, and XP reward values.
+
+### 5. Intelligent Session Tracker (`[5] Session`)
+- **Hybrid Session Resumption**: Automatically resumes your session if your last match occurred within the past 2 hours; otherwise anchors to midnight today for a fresh daily view.
+- **Mode Filter Toggle (`m`)**: Switch on the fly between `Competitive Only` and `Comp + Unrated + Swiftplay + Spike Rush` (casual Deathmatch and custom matches are permanently excluded from session statistics).
+- **Real-Time Summary Card**: Displays games played, W-L-D record, Win Rate %, Net RR pill, Current Rank & RR, Average KDA, K/D ratio, Average ACS, Average HS%, Average ADR, and elapsed session duration.
+- **Session Match Breakdown Table**: Scrollable table detailing every match played during the session with agent icons, scores, combat stats, and individual RR deltas.
+- **Manual Session Reset (`x`)**: Clear the active session and start a new tracking baseline at any point.
+- **Silent Background Auto-Polling**: Every 30 seconds, `val0` silently checks for completed matches while on Tab 2 or Tab 5, updating stats seamlessly without UI freezes or loading flickers.
 
 ---
 
 ## Architecture & Authentication
 
-`val0` uses a local-first, zero-credential authentication mechanism that interfaces directly with the official Riot Client running on your machine:
+`val0` uses a zero-credential, local-first authentication design that communicates strictly with the official Riot Client running locally on Windows:
 
 ```text
 +---------------------+         +----------------------+         +-----------------------+
@@ -67,11 +69,17 @@ What began as a tiny Go script to read local authentication tokens and query the
                                 +----------------------+
 ```
 
-### Why the Lockfile Route?
-- **Zero Credential Entry**: You never enter your Riot username, password, or two-factor authentication codes into `val0`. No credentials are ever collected, stored, or transmitted.
-- **Local Loopback TLS**: `val0` discovers the active Riot Client process via the local `lockfile` generated in `%LOCALAPPDATA%\Riot Games\Riot Client\Config\lockfile`. It communicates strictly with the local client on `127.0.0.1` over loopback HTTPS using standard HTTP Basic authentication to obtain short-lived session tokens (Entitlements JWT and Access Bearer token).
-- **Non-Invasive & Read-Only**: `val0` acts entirely as a read-only spectator. It does not inject DLLs, hook game memory, modify game files, or interact with Vanguard anti-cheat in any way.
-- **Transient Memory**: Session tokens remain exclusively in transient application memory during execution and expire naturally when the application terminates.
+### Authentication & Shard Discovery
+1. **Zero Credential Entry**: You never provide your Riot username, password, or 2FA codes. No credentials are ever collected, transmitted, or stored on disk.
+2. **Local Loopback Discovery**: `val0` reads `%LOCALAPPDATA%\Riot Games\Riot Client\Config\lockfile` to obtain the local client port and authorization secret, communicating strictly over `127.0.0.1` HTTPS to retrieve short-lived Entitlements and Access JWTs.
+3. **4-Stage Region & Shard Auto-Detection**:
+   - *Stage 1*: Parses `%LOCALAPPDATA%\VALORANT\Saved\Logs\ShooterGame.log` for active game server shard URLs (`pd.<shard>.a.pvp.net`).
+   - *Stage 2*: Queries the local Riot Client `/product-session/v1/external-sessions` endpoint for active process arguments (`-ares-deployment`).
+   - *Stage 3*: Queries the Riot Geo PAS endpoint (`riot-geo.pas.si.riotgames.com`) with the session token.
+   - *Stage 4*: Performs active shard probing across standard regions (`na`, `eu`, `ap`, `kr`).
+   - *Fallback*: If auto-detection fails, an interactive region selection modal allows manual shard selection.
+4. **Read-Only & Vanguard Safe**: `val0` performs no code injection, modifies no memory or game files, and runs purely as an external diagnostic reader. Tokens are kept in transient memory and discarded upon exit.
+5. **Windows Terminal Auto-Relaunch**: If `val0.exe` is launched via Windows Explorer (conhost.exe), it automatically detects the legacy console host and respawns cleanly inside Windows Terminal (`wt.exe`) to guarantee true-color and Sixel graphics support.
 
 ---
 
@@ -79,85 +87,97 @@ What began as a tiny Go script to read local authentication tokens and query the
 
 ### Installation
 
-#### Pre-built Binaries
-Download the pre-compiled binary for your operating system and architecture from the [GitHub Releases](https://github.com/val-tracker/val-tracker/releases) page. Extract the archive and place the `val0` binary anywhere in your system `PATH`.
+#### Pre-built Binaries (Windows x64 / ARM64)
+Download the latest `val0.exe` from the GitHub Releases page and place it anywhere in your Windows `PATH` (or double-click to launch).
 
 #### Building from Source
-Prerequisites: **Go 1.22** or later.
+Prerequisites: **Go 1.22** or later installed on Windows.
 
-```bash
+```powershell
 # Clone the repository
 git clone https://github.com/val-tracker/val-tracker.git
 cd val-tracker
 
-# Download dependencies and build binary
-go build -o val0 .
+# Compile the Windows binary
+go build -o val0.exe .
 ```
 
 ### Usage
 
-1. Launch the official **Riot Client** and log into your account.
-2. Run `val0` in your terminal:
-   ```bash
-   ./val0
+1. Start the **Riot Client** and log into your account (or start Valorant).
+2. Launch `val0` from Windows Terminal, PowerShell, Command Prompt, or by double-clicking `val0.exe`:
+   ```powershell
+   .\val0.exe
    ```
-3. If the Riot Client is closed or has not yet authenticated, `val0` will present a connection error screen indicating that the lockfile could not be found. Simply open the Riot Client, wait for login to complete, and press `r` to retry the connection (or `q` to quit).
+3. If the Riot Client is not yet running, `val0` displays a connection prompt. Start the client, wait for login, and press `r` to connect (or `q` to exit).
 
-### Keyboard Navigation
+---
+
+## Keyboard Navigation
 
 | Scope | Keybinding | Action |
 |:---|:---|:---|
-| **Global** | `1` | Switch to Store & Wishlist Tab |
+| **Global Navigation** | `1` | Switch to Store & Wishlist Tab |
 | | `2` | Switch to Match History Tab |
-| | `3` | Switch to Performance Stats Tab |
+| | `3` | Switch to Performance & Weapon Stats Tab |
 | | `4` | Switch to Battlepass & Missions Tab |
+| | `5` | Switch to Session Tracker Tab |
 | | `h` / `l` or `Left` / `Right` | Navigate to Previous / Next Tab |
-| | `r` | Refresh all data and invalidate image caches |
-| | `q` / `Ctrl+C` | Exit application |
+| | `r` | Invalidate caches and force refresh all API data |
+| | `q` / `Ctrl+C` | Quit application |
 | **Store Navigation** | `s` | Switch to Daily Shop view |
-| | `w` | Switch to Wishlist & Catalog view |
+| | `w` | Switch to Wishlist & Skin Catalog view |
 | | `n` | Switch to Night Market view (when active) |
-| **Wishlist & Catalog** | `Tab` / `Shift+Tab` | Toggle focus between Wishlist and Catalog Search |
-| | `j` / `k` or `Down` / `Up` | Navigate items in active section |
-| | `Enter` | Add selected skin from search results to wishlist |
+| **Wishlist & Catalog** | `Tab` / `Shift+Tab` | Switch focus between Wishlist and Catalog Search |
+| *(Wishlist Focused)* | `j` / `k` or `Down` / `Up` | Navigate wishlisted items |
 | | `x` / `Delete` | Remove selected item from wishlist |
-| | `Esc` | Return focus to wishlist list |
-| **Match History** | `j` / `k` or `Down` / `Up` | Scroll through recent match records |
+| *(Catalog Focused)* | *Type characters* | Filter skin catalog in real time |
+| | `Backspace` | Delete search characters |
+| | `Down` / `Up` | Navigate filtered catalog results |
+| | `Enter` | Add selected skin to wishlist |
+| | `Esc` | Return focus to Wishlist list |
+| **Match History** | `j` / `k` or `Down` / `Up` | Scroll through recent match list |
 | | `Enter` | Open Deep Match Scoreboard for selected match |
 | | `Esc` / `Backspace` / `Left` | Return from Scoreboard to Match List |
-| **Performance Stats** | `j` / `k` or `Down` / `Up` | Scroll down / up through performance metrics |
+| **Performance Stats** | `j` / `k` or `Down` / `Up` / `s` / `w` | Scroll down / up through performance metrics |
+| **Session Tracker** | `m` | Toggle mode filter (`Competitive Only` vs `All Modes`) |
+| | `x` | Reset active session tracking |
+| | `j` / `k` or `Down` / `Up` | Scroll through session match breakdown table |
 
-### Configuration & Environment Variables
+---
 
-`val0` automatically detects the most optimal graphics protocol supported by your terminal emulator. You can explicitly override this behavior via command-line flags or environment variables:
+## Configuration & Environment Variables
 
-| Parameter | Type | Options | Description |
-|:---|:---|:---|:---|
-| `--graphics` | CLI Flag | `sixel`, `kitty`, `iterm2`, `halfblock`, `none` | Explicitly force a graphics rendering protocol |
-| `VAL0_GRAPHICS` | Environment Variable | `sixel`, `kitty`, `iterm2`, `halfblock`, `none` | Equivalent environment override |
+### Graphics Protocol Override
+`val0` automatically probes terminal capabilities and selects the highest-fidelity graphics protocol supported:
 
-#### Local Storage & Cache Paths
-- **Windows**: `%APPDATA%\val-tracker\`
-- **Linux / macOS**: `~/.config/val-tracker/`
+| Flag / Variable | Options | Description |
+|:---|:---|:---|
+| `--graphics <proto>` | `sixel`, `kitty`, `halfblock`, `none` | CLI flag to force a specific rendering protocol |
+| `VAL0_GRAPHICS` | `sixel`, `kitty`, `halfblock`, `none` | Environment variable equivalent |
 
-These directories persist `wishlist.json` (user-selected wishlist items) and `skins.json` (cached static skin assets validated against the remote client version to minimize network requests).
+### Local Storage Paths
+All persistent configuration and cache files reside in standard Windows AppData:
+- `%APPDATA%\val-tracker\wishlist.json`: Saved skin wishlist entries.
+- `%APPDATA%\val-tracker\session.json`: Active session baseline and match tracking data.
+- `%APPDATA%\val-tracker\skins.json`: Cached weapon skin asset metadata (automatically validated against remote client versions).
 
 ---
 
 ## API Reference & Data Sources
 
-`val0` aggregates data across local loopback services, remote Riot PVP infrastructure, and community static endpoints:
-
 | Layer | Service / Endpoint | Description |
 |:---|:---|:---|
-| **Local Client** | `GET https://127.0.0.1:<port>/entitlements/v1/token` | Fetches Access Bearer token, Entitlements JWT, and player PUUID |
-| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/store/v2/storefront/{puuid}` | Daily rotating store offers and active Night Market offers |
+| **Local Client** | `GET https://127.0.0.1:<port>/entitlements/v1/token` | Access Bearer token, Entitlements JWT, and player PUUID |
+| **Local Client** | `GET https://127.0.0.1:<port>/product-session/v1/external-sessions` | Local process metadata for deployment/shard auto-detection |
+| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/store/v2/storefront/{puuid}` | Daily rotating store offers and Night Market offers |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/store/v1/wallet/{puuid}` | Player balances (Valorant Points, Radianite, Kingdom Credits) |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/match-history/v1/history/{puuid}` | Recent match history list and match IDs |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/match-details/v1/matches/{matchId}` | Comprehensive 10-player match scoreboard, economy, and rounds |
 | **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/mmr/v1/players/{puuid}/competitiveupdates` | Ranked Rating (RR) delta history and tier movements |
-| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/mmr/v1/players/{puuid}` | Current competitive rank, leaderboards, and seasonal MMR |
-| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/contracts/v1/contracts/{puuid}` | Active battlepass tier progress, total XP, and mission progress |
+| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/mmr/v1/players/{puuid}` | Current competitive rank, seasonal MMR, and tier progress |
+| **Remote Riot PVP** | `GET https://pd.<shard>.a.pvp.net/contracts/v1/contracts/{puuid}` | Active battlepass tier progression and mission progress |
+| **Remote Riot PVP** | `PUT https://pd.<shard>.a.pvp.net/name-service/v2/players` | Shard liveness probe and validation |
 | **Static Assets** | `GET https://valorant-api.com/v1/weapons/skins` | Weapon skin names, rarity tiers, and weapon icon sprites |
 | **Static Assets** | `GET https://valorant-api.com/v1/version` | Live client version metadata for cache invalidation |
 
@@ -166,19 +186,19 @@ These directories persist `wishlist.json` (user-selected wishlist items) and `sk
 ## Acknowledgments
 
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) & [Lipgloss](https://github.com/charmbracelet/lipgloss) by Charmbracelet for the terminal UI runtime and styling primitives.
-- [valorant-api.com](https://valorant-api.com) for maintaining open-access static game metadata and asset graphics.
-- [go-sixel](https://github.com/mattn/go-sixel) by mattn for high-speed terminal Sixel image encoding.
-- The Valorant API community documentation contributors for reverse-engineering endpoints and data models.
+- [valorant-api.com](https://valorant-api.com) for maintaining community game metadata and asset graphics.
+- [go-sixel](https://github.com/mattn/go-sixel) by mattn for fast terminal Sixel image encoding.
+- The Valorant API community for reverse-engineering endpoints and data structures.
 
 ---
 
 ## Security & Legal Disclaimer
 
-### Read-Only & Non-Invasive Guarantee
-`val0` is an external diagnostic dashboard that communicates with public and loopback HTTP APIs. It does not inject code into the game process, does not manipulate memory, does not modify game assets, and does not provide any in-game tactical advantages. It strictly adheres to fair-use principles and safe execution alongside Riot Vanguard.
+### Read-Only & Fair Use
+`val0` is an external diagnostic companion that interfaces exclusively with local loopback and standard HTTP endpoints. It does not inject code into the Valorant game process, does not inspect or manipulate game memory, does not modify game assets, and provides no tactical in-game advantages. It is safe to run alongside Riot Vanguard.
 
 ### Trademark Notice
-`val0` is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and Valorant are trademarks or registered trademarks of Riot Games, Inc. Valorant © Riot Games, Inc.
+`val0` is not affiliated with or endorsed by Riot Games, Inc. Valorant and Riot Games are trademarks or registered trademarks of Riot Games, Inc.
 
 ### License
-This project is open-source software licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).

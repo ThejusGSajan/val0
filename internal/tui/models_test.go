@@ -1553,3 +1553,229 @@ func TestMatchesModelRoundTimelineUnderline(t *testing.T) {
 		t.Errorf("expected second line to start with '  ─', got: %q", lines[1])
 	}
 }
+
+func TestStatsModel_CasualModesFiltered(t *testing.T) {
+	puUID := "test-player-puuid"
+	agentsMap := map[string]string{
+		"agent-jett":  "Jett",
+		"agent-sova":  "Sova",
+		"agent-gekko": "Gekko",
+		"agent-reyna": "Reyna",
+		"agent-clove": "Clove",
+		"agent-raze":  "Raze",
+	}
+	weaponsMap := map[string]string{
+		"w-vandal":  "Vandal",
+		"w-phantom": "Phantom",
+	}
+
+	// 1. Tactical Match 1: Competitive (Jett)
+	compMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-comp",
+			QueueID:  "competitive",
+			GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				TeamID:      "Blue",
+				CharacterID: "agent-jett",
+				Stats: models.PlayerStats{
+					Score:        4500,
+					RoundsPlayed: 20,
+					Kills:        20,
+					Deaths:       10,
+					Assists:      5,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+			{TeamID: "Red", Won: false, RoundsWon: 7},
+		},
+	}
+
+	// 2. Tactical Match 2: Unrated (Sova)
+	unratedMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-unrated",
+			QueueID:  "unrated",
+			GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				TeamID:      "Red",
+				CharacterID: "agent-sova",
+				Stats: models.PlayerStats{
+					Score:        3000,
+					RoundsPlayed: 18,
+					Kills:        15,
+					Deaths:       12,
+					Assists:      8,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Red", Won: false, RoundsWon: 5},
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+		},
+	}
+
+	// 3. FFA Deathmatch (Empty QueueID, GameMode asset path) — THE BUG SCENARIO (Gekko)
+	dmEmptyQueueMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-dm-empty-queue",
+			QueueID:  "",
+			GameMode: "/Game/GameModes/Deathmatch/DeathmatchGameMode.DeathmatchGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				CharacterID: "agent-gekko",
+				Stats: models.PlayerStats{
+					Score:        6800,
+					RoundsPlayed: 1,
+					Kills:        32,
+					Deaths:       25,
+					Assists:      4,
+				},
+			},
+		},
+	}
+
+	// 4. FFA Deathmatch (Explicit QueueID "deathmatch") (Reyna)
+	dmExplicitMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-dm-explicit",
+			QueueID:  "deathmatch",
+			GameMode: "Deathmatch",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				CharacterID: "agent-reyna",
+				Stats: models.PlayerStats{
+					Score:        8000,
+					RoundsPlayed: 1,
+					Kills:        40,
+					Deaths:       20,
+					Assists:      2,
+				},
+			},
+		},
+	}
+
+	// 5. Team Deathmatch / Hurm (Empty QueueID, Hurm GameMode) (Clove)
+	tdmMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-tdm",
+			QueueID:  "",
+			GameMode: "/Game/GameModes/Hurm/HurmGameMode.HurmGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				CharacterID: "agent-clove",
+				Stats: models.PlayerStats{
+					Score:        5000,
+					RoundsPlayed: 1,
+					Kills:        25,
+					Deaths:       18,
+					Assists:      6,
+				},
+			},
+		},
+	}
+
+	// 6. Escalation / GGTeam (Explicit QueueID "ggteam") (Raze)
+	escalationMatch := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-escalation",
+			QueueID:  "ggteam",
+			GameMode: "/Game/GameModes/GunGame/GGTeamGameMode.GGTeamGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				CharacterID: "agent-raze",
+				Stats: models.PlayerStats{
+					Score:        3500,
+					RoundsPlayed: 1,
+					Kills:        18,
+					Deaths:       14,
+					Assists:      3,
+				},
+			},
+		},
+	}
+
+	allMatches := []*models.MatchDetails{
+		compMatch,
+		dmEmptyQueueMatch,
+		unratedMatch,
+		dmExplicitMatch,
+		tdmMatch,
+		escalationMatch,
+	}
+
+	sm := NewStatsModel(allMatches, puUID, nil, agentsMap, weaponsMap, "Diamond 2")
+	sm.SetSize(120, 35)
+	view := sm.View()
+
+	// Verification 1: Only 2 tactical matches counted in hsHistory
+	if len(sm.hsHistory) != 2 {
+		t.Errorf("expected hsHistory length 2 (tactical matches only), got %d", len(sm.hsHistory))
+	}
+
+	// Verification 2: View header reflects "Last 2 matches"
+	if !strings.Contains(view, "Last 2 matches") {
+		t.Errorf("expected view to contain 'Last 2 matches', got:\n%s", view)
+	}
+
+	// Verification 3: Only 2 agents in agentStats (Jett, Sova)
+	if len(sm.agentStats) != 2 {
+		t.Errorf("expected 2 agent stats, got %d", len(sm.agentStats))
+	}
+
+	// Verification 4: Tactical agents exist in View
+	if !strings.Contains(view, "Jett") {
+		t.Errorf("expected view to contain Jett")
+	}
+	if !strings.Contains(view, "Sova") {
+		t.Errorf("expected view to contain Sova")
+	}
+
+	// Verification 5: Casual agents MUST NOT exist in agentStats or View
+	excludedAgents := []string{"Gekko", "Reyna", "Clove", "Raze"}
+	for _, agent := range sm.agentStats {
+		for _, excl := range excludedAgents {
+			if agent.AgentName == excl {
+				t.Errorf("excluded agent %s found in agentStats", excl)
+			}
+		}
+	}
+	for _, excl := range excludedAgents {
+		if strings.Contains(view, excl) {
+			t.Errorf("excluded agent %s found in View() output", excl)
+		}
+	}
+
+	// Verification 6: Jett stats not distorted (1 match, 20 rounds, ACS = 4500/20 = 225)
+	var jettStat *AgentStat
+	for i := range sm.agentStats {
+		if sm.agentStats[i].AgentName == "Jett" {
+			jettStat = &sm.agentStats[i]
+			break
+		}
+	}
+	if jettStat == nil {
+		t.Fatalf("jettStat not found")
+	}
+	if jettStat.Matches != 1 || jettStat.Wins != 1 || jettStat.TotalRounds != 20 {
+		t.Errorf("unexpected Jett stats: Matches=%d Wins=%d Rounds=%d",
+			jettStat.Matches, jettStat.Wins, jettStat.TotalRounds)
+	}
+}
+
