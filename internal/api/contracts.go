@@ -3,7 +3,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
 )
 
@@ -42,17 +44,24 @@ func (c *Client) FetchContent() (*models.ContentResponse, error) {
 }
 
 // FindActiveBattlepass identifies the battlepass contract from the
-// contracts list by cross-referencing with the active season.
+// contracts list by cross-referencing with the active season or explicit contract definition ID.
 // Returns the matching Contract and true, or zero-value and false.
 func FindActiveBattlepass(
 	contracts *models.ContractsResponse,
 	content *models.ContentResponse,
+	bpContractDefID ...string,
 ) (models.Contract, bool) {
 	if contracts == nil || content == nil {
 		return models.Contract{}, false
 	}
 
-	// Find the currently active act
+	// 1. Explicit Contract Definition ID if resolved from asset cache
+	var targetDefID string
+	if len(bpContractDefID) > 0 && bpContractDefID[0] != "" {
+		targetDefID = bpContractDefID[0]
+	}
+
+	// 2. Identify active Act ID
 	var activeActID string
 	for _, s := range content.Seasons {
 		if s.IsActive && s.Type == "act" {
@@ -61,23 +70,38 @@ func FindActiveBattlepass(
 		}
 	}
 
-	// The battlepass ContractDefinitionID matches the active act's ID
-	// in most implementations.
-	if activeActID != "" {
+	// 3. Check KnownBattlepassContracts map if targetDefID not provided
+	if targetDefID == "" && activeActID != "" {
+		targetDefID = cache.KnownBattlepassContracts[activeActID]
+	}
+
+	// 4. Match against targetDefID
+	if targetDefID != "" {
 		for _, c := range contracts.Contracts {
-			if c.ContractDefinitionID == activeActID {
+			if strings.EqualFold(c.ContractDefinitionID, targetDefID) {
 				return c, true
 			}
 		}
 	}
 
-	// Fallback: return the contract with the highest total progression
-	// (the battlepass accumulates significantly more XP than character contracts).
+	// 5. Direct activeActID match (legacy/test compatibility)
+	if activeActID != "" {
+		for _, c := range contracts.Contracts {
+			if strings.EqualFold(c.ContractDefinitionID, activeActID) {
+				return c, true
+			}
+		}
+	}
+
+	// 6. Safe Fallback: Exclude active agent special contract
 	var best models.Contract
 	var bestXP int
 	for _, c := range contracts.Contracts {
-		xp := c.ContractProgression.TotalProgressionEarned
-		if xp > bestXP {
+		if contracts.ActiveSpecialContract != "" &&
+			strings.EqualFold(c.ContractDefinitionID, contracts.ActiveSpecialContract) {
+			continue
+		}
+		if xp := c.ContractProgression.TotalProgressionEarned; xp > bestXP {
 			bestXP = xp
 			best = c
 		}

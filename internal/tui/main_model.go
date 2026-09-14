@@ -824,6 +824,7 @@ func (m MainModel) loadData() tea.Msg {
 	mapsMap, _ = cache.LoadOrFetchMaps(m.session.ClientVersion)
 	weaponsMap, _ = cache.LoadOrFetchWeapons(m.session.ClientVersion)
 	missionsMap, _ = cache.LoadOrFetchMissions(m.session.ClientVersion)
+	contractsAssetCache, _ := cache.LoadOrFetchContracts(m.session.ClientVersion)
 
 	wg.Wait()
 
@@ -926,12 +927,34 @@ func (m MainModel) loadData() tea.Msg {
 	if contracts != nil {
 		missions = contracts.Missions
 		if content != nil {
-			if bp, found := api.FindActiveBattlepass(contracts, content); found {
+			var activeActID string
+			for _, s := range content.Seasons {
+				if s.IsActive && s.Type == "act" {
+					activeActID = s.ID
+					break
+				}
+			}
+
+			var bpDefID string
+			var levelXPs []int
+			if bpAsset := cache.FindBattlepassContractAsset(contractsAssetCache, activeActID); bpAsset != nil {
+				bpDefID = bpAsset.UUID
+				levelXPs = cache.GetBattlepassLevelXPs(bpAsset)
+			}
+			if len(levelXPs) == 0 {
+				levelXPs = cache.DefaultBattlepassLevelXPs()
+			}
+
+			if bp, found := api.FindActiveBattlepass(contracts, content, bpDefID); found {
+				curTier, xpInTier, xpForTier, _ := cache.CalculateBattlepassTier(
+					bp.ContractProgression.TotalProgressionEarned,
+					levelXPs,
+				)
 				bpData = &BattlepassData{
-					CurrentTier:     bp.ProgressionLevelReached,
-					MaxTier:         55,
-					XPInCurrentTier: bp.ProgressionTowardsNextLevel,
-					XPForNextTier:   bp.ContractProgression.TotalProgressionTowardsNextLevel,
+					CurrentTier:     curTier,
+					MaxTier:         len(levelXPs),
+					XPInCurrentTier: xpInTier,
+					XPForNextTier:   xpForTier,
 					TotalXP:         bp.ContractProgression.TotalProgressionEarned,
 				}
 			}

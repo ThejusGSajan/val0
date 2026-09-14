@@ -64,22 +64,31 @@ func (m ProgressModel) View() string {
 
 		overallPct := 0.0
 		if d.MaxTier > 0 {
-			overallPct = float64(d.CurrentTier) / float64(d.MaxTier)
+			tierFraction := 0.0
+			if d.XPForNextTier > 0 {
+				tierFraction = float64(d.XPInCurrentTier) / float64(d.XPForNextTier)
+			}
+			overallPct = (float64(d.CurrentTier-1) + tierFraction) / float64(d.MaxTier)
 		}
 		overallBar := renderProgressBar(overallPct, barWidth, "Overall Progression")
 
-		tierPct := 0.0
-		if d.XPForNextTier > 0 {
-			tierPct = float64(d.XPInCurrentTier) / float64(d.XPForNextTier)
+		var tierBar string
+		if d.CurrentTier >= d.MaxTier && d.XPInCurrentTier >= d.XPForNextTier {
+			tierBar = renderProgressBar(1.0, barWidth, fmt.Sprintf("Battlepass Completed! (%d / %d)", d.MaxTier, d.MaxTier))
+		} else {
+			tierPct := 0.0
+			if d.XPForNextTier > 0 {
+				tierPct = float64(d.XPInCurrentTier) / float64(d.XPForNextTier)
+			}
+			tierBar = renderProgressBar(tierPct, barWidth,
+				fmt.Sprintf("Tier %d → %d  (%s / %s XP)",
+					d.CurrentTier-1, d.CurrentTier,
+					formatNumber(d.XPInCurrentTier), formatNumber(d.XPForNextTier)))
 		}
-		tierBar := renderProgressBar(tierPct, barWidth,
-			fmt.Sprintf("Tier %d → %d  (%d / %d XP)",
-				d.CurrentTier, d.CurrentTier+1,
-				d.XPInCurrentTier, d.XPForNextTier))
 
 		totalXP := lipgloss.NewStyle().
 			Foreground(ColorMuted).
-			Render(fmt.Sprintf("  Total XP Earned: %d", d.TotalXP))
+			Render(fmt.Sprintf("  Total XP Earned: %s", formatNumber(d.TotalXP)))
 
 		sections = append(sections, header, "", overallBar, "", tierBar, "", totalXP)
 	} else {

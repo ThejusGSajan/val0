@@ -98,3 +98,80 @@ func TestFindActiveBattlepass_FallbackHighestXP(t *testing.T) {
 		t.Errorf("expected bp-def-id, got %s", bp.ContractDefinitionID)
 	}
 }
+
+func TestFindActiveBattlepass_ExplicitDefID(t *testing.T) {
+	explicitDefID := "explicit-bp-def-uuid"
+
+	content := &models.ContentResponse{
+		Seasons: []models.Season{
+			{
+				ID:       "season-act-uuid",
+				Type:     "act",
+				IsActive: true,
+			},
+		},
+	}
+
+	contracts := &models.ContractsResponse{
+		Contracts: []models.Contract{
+			{
+				ContractDefinitionID: "other-contract-id",
+				ContractProgression: models.ContractProgression{
+					TotalProgressionEarned: 500000,
+				},
+			},
+			{
+				ContractDefinitionID: explicitDefID,
+				ContractProgression: models.ContractProgression{
+					TotalProgressionEarned: 45000,
+				},
+			},
+		},
+	}
+
+	bp, found := FindActiveBattlepass(contracts, content, explicitDefID)
+	if !found {
+		t.Fatal("expected to find active battlepass with explicit def ID")
+	}
+	if bp.ContractDefinitionID != explicitDefID {
+		t.Errorf("expected ContractDefinitionID %s, got %s", explicitDefID, bp.ContractDefinitionID)
+	}
+}
+
+func TestFindActiveBattlepass_ExcludeActiveSpecialContract(t *testing.T) {
+	content := &models.ContentResponse{
+		Seasons: []models.Season{
+			{
+				ID:       "unmatched-season",
+				Type:     "act",
+				IsActive: true,
+			},
+		},
+	}
+
+	contracts := &models.ContractsResponse{
+		ActiveSpecialContract: "agent-special-contract",
+		Contracts: []models.Contract{
+			{
+				ContractDefinitionID: "agent-special-contract",
+				ContractProgression: models.ContractProgression{
+					TotalProgressionEarned: 999999, // higher XP, but is active special agent contract
+				},
+			},
+			{
+				ContractDefinitionID: "actual-battlepass-contract",
+				ContractProgression: models.ContractProgression{
+					TotalProgressionEarned: 50000,
+				},
+			},
+		},
+	}
+
+	bp, found := FindActiveBattlepass(contracts, content)
+	if !found {
+		t.Fatal("expected to find battlepass via safe fallback")
+	}
+	if bp.ContractDefinitionID != "actual-battlepass-contract" {
+		t.Errorf("expected actual-battlepass-contract, got %s", bp.ContractDefinitionID)
+	}
+}

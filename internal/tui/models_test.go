@@ -119,8 +119,28 @@ func TestBattlepassModelView(t *testing.T) {
 	if !strings.Contains(view, "Tier 30 / 55") {
 		t.Errorf("expected view to contain 'Tier 30 / 55', got:\n%s", view)
 	}
-	if !strings.Contains(view, "450000") {
-		t.Errorf("expected view to contain total XP, got:\n%s", view)
+	if !strings.Contains(view, "450,000") {
+		t.Errorf("expected view to contain formatted total XP '450,000', got:\n%s", view)
+	}
+	if !strings.Contains(view, "Tier 29 → 30") || !strings.Contains(view, "12,000 / 24,000 XP") {
+		t.Errorf("expected view to contain 'Tier 29 → 30' and formatted XP, got:\n%s", view)
+	}
+
+	// Completed battlepass check
+	completedData := &BattlepassData{
+		CurrentTier:     55,
+		MaxTier:         55,
+		XPInCurrentTier: 36500,
+		XPForNextTier:   36500,
+		TotalXP:         1200000,
+	}
+	completedModel := NewBattlepassModel(completedData)
+	compView := completedModel.View()
+	if !strings.Contains(compView, "Battlepass Completed! (55 / 55)") {
+		t.Errorf("expected completed banner 'Battlepass Completed! (55 / 55)', got:\n%s", compView)
+	}
+	if !strings.Contains(compView, "100%") {
+		t.Errorf("expected 100%% for completed pass, got:\n%s", compView)
 	}
 }
 

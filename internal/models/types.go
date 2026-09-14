@@ -129,7 +129,7 @@ type Contract struct {
 
 type ContractProgression struct {
 	TotalProgressionEarned           int            `json:"TotalProgressionEarned"`
-	TotalProgressionTowardsNextLevel int            `json:"TotalProgressionTowardsNextLevel"`
+	TotalProgressionTowardsNextLevel int            `json:"TotalProgressionTowardsNextLevel,omitempty"`
 	HighestRewardedLevel             map[string]any `json:"HighestRewardedLevel"`
 }
 
@@ -236,4 +236,40 @@ type ResolvedSkin struct {
 	IconURL       string
 	FullRenderURL string
 	Sprite        string // pre-rendered ANSI block-character fallback
+}
+
+// ── valorant-api.com Contracts Assets ───────────────────────────────
+
+type ValorantAPIContractsResponse struct {
+	Status int             `json:"status"`
+	Data   []ContractAsset `json:"data"`
+}
+
+type ContractAsset struct {
+	UUID         string               `json:"uuid"`
+	DisplayName  string               `json:"displayName"`
+	DisplayIcon  *string              `json:"displayIcon"`
+	Content      ContractAssetContent `json:"content"`
+	ShipmentUUID string               `json:"shipmentUuid"`
+}
+
+type ContractAssetContent struct {
+	RelationType    string            `json:"relationType"` // "Season" for battlepasses
+	RelationUUID    string            `json:"relationUuid"` // Season UUID matching ContentResponse
+	Chapters        []ContractChapter `json:"chapters"`
+	PremiumVouchers []any             `json:"premiumVouchers"`
+	SpecialContent  []any             `json:"specialContent"`
+}
+
+type ContractChapter struct {
+	IsEpilogue  bool            `json:"isEpilogue"`
+	Levels      []ContractLevel `json:"levels"`
+	FreeRewards []any           `json:"freeRewards"`
+}
+
+type ContractLevel struct {
+	Reward              map[string]any `json:"reward"`
+	XP                  int            `json:"xp"`
+	VPCost              int            `json:"vpCost"`
+	IsPurchasableWithVP bool           `json:"isPurchasableWithVP"`
 }
