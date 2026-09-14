@@ -180,9 +180,23 @@ type SkinAsset struct {
 	ThemeUUID       string       `json:"themeUuid"`
 	ContentTierUUID *string      `json:"contentTierUuid"` // nil for base skins
 	DisplayIcon     *string      `json:"displayIcon"`     // URL, nullable
+	AssetPath       string       `json:"assetPath"`       // e.g. ShooterGame/Content/Equippables/Melee/...
 	Chromas         []SkinChroma `json:"chromas"`
 	Levels          []SkinLevel  `json:"levels"`
 }
+
+const (
+	TierSelectUUID    = "12683d76-48d7-84a3-4e09-6985794f0445" // 875 VP / 1,750 Melee
+	TierDeluxeUUID    = "0cebb8be-46d7-c12a-d306-e9907bfc5a25" // 1,275 VP / 2,550 Melee
+	TierPremiumUUID   = "60bca009-4182-7998-dee7-b8a2558dc369" // 1,775 VP / 3,550 Melee
+	TierExclusiveUUID = "e046854e-406c-37f4-6607-19a9ba8426fc" // 2,175 VP / 4,350 Melee / 5,350 Special
+	TierUltraUUID     = "411e4a55-4e59-7757-41f0-86a53f101bb5" // 2,475 VP / 4,950 Melee
+
+	// Alternate / dev tier UUIDs
+	TierSelectUUIDAlt = "12683d76-48d7-84a3-4e09-68857792c04f"
+	TierDeluxeUUIDAlt = "0e38b80a-4776-9e3e-1b21-aca75b6370e2"
+	TierUltraUUIDAlt  = "411e4a55-4e59-775b-37d0-7ac535386085"
+)
 
 type SkinLevel struct {
 	UUID        string  `json:"uuid"`

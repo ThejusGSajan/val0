@@ -76,7 +76,17 @@ func LoadOrFetchSkins(currentVersion string) ([]models.SkinAsset, error) {
 	if data, err := os.ReadFile(path); err == nil {
 		var sc skinCache
 		if json.Unmarshal(data, &sc) == nil && sc.Version == currentVersion {
-			return sc.Skins, nil // cache hit
+			// Invalidate cache if cached skins lack AssetPath (migration to v36)
+			hasAssetPath := false
+			for _, s := range sc.Skins {
+				if s.AssetPath != "" {
+					hasAssetPath = true
+					break
+				}
+			}
+			if len(sc.Skins) > 0 && hasAssetPath {
+				return sc.Skins, nil // cache hit
+			}
 		}
 	}
 

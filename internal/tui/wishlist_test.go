@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/val-tracker/val-tracker/internal/cache"
 	"github.com/val-tracker/val-tracker/internal/models"
 	"github.com/val-tracker/val-tracker/internal/sprite"
 )
@@ -278,5 +279,68 @@ func TestWishlist_EmptySearchResults(t *testing.T) {
 	}
 	if strings.Contains(view, "\x1b]999;INJECT_") {
 		t.Errorf("expected no overlay placeholder when no skin is selected")
+	}
+}
+
+func TestWishlist_MeleePricingAndAutoHealing(t *testing.T) {
+	premiumTier := models.TierPremiumUUID
+	exclusiveTier := models.TierExclusiveUUID
+	themeUUID := "soulstrife-theme-uuid"
+
+	m := NewWishlistModel()
+	// Stale entries previously persisted with gun-only price switch
+	m.entries = []cache.WishlistEntry{
+		{
+			UUID:    "soulstrife-scythe-uuid",
+			Name:    "Soulstrife Scythe",
+			Rarity:  "Exclusive",
+			CostVP:  2175,
+			IconURL: "",
+		},
+		{
+			UUID:    "phaseguard-splitter-uuid",
+			Name:    "Phaseguard Splitter",
+			Rarity:  "Exclusive",
+			CostVP:  2175,
+			IconURL: "",
+		},
+	}
+
+	skins := []models.SkinAsset{
+		{
+			UUID:            "soulstrife-ghost-uuid",
+			DisplayName:     "Soulstrife Ghost",
+			ThemeUUID:       themeUUID,
+			ContentTierUUID: &premiumTier,
+			AssetPath:       "ShooterGame/Content/Equippables/Guns/Pistols/Luger/Luger_Asset",
+		},
+		{
+			UUID:            "soulstrife-scythe-uuid",
+			DisplayName:     "Soulstrife Scythe",
+			ThemeUUID:       themeUUID,
+			ContentTierUUID: &exclusiveTier,
+			AssetPath:       "ShooterGame/Content/Equippables/Melee/Scythe/Scythe_Asset",
+		},
+		{
+			UUID:            "phaseguard-splitter-uuid",
+			DisplayName:     "Phaseguard Splitter",
+			ContentTierUUID: &exclusiveTier,
+			AssetPath:       "ShooterGame/Content/Equippables/Melee/Splitter/Splitter_Asset",
+		},
+	}
+
+	m.SetAllSkins(skins)
+
+	// Verify Soulstrife Scythe auto-healed to Premium 3550 VP
+	if m.entries[0].CostVP != 3550 {
+		t.Errorf("expected Soulstrife Scythe CostVP to auto-heal to 3550, got: %d", m.entries[0].CostVP)
+	}
+	if m.entries[0].Rarity != "Premium" {
+		t.Errorf("expected Soulstrife Scythe Rarity to auto-heal to Premium, got: %s", m.entries[0].Rarity)
+	}
+
+	// Verify Phaseguard Splitter auto-healed to 5350 VP
+	if m.entries[1].CostVP != 5350 {
+		t.Errorf("expected Phaseguard Splitter CostVP to auto-heal to 5350, got: %d", m.entries[1].CostVP)
 	}
 }

@@ -856,11 +856,16 @@ func (m MainModel) loadData() tea.Msg {
 
 		iconURL, fullRenderURL := resolveSkinImages(asset)
 
+		costVP := offer.Cost[vpUUID]
+		if costVP > 0 {
+			cache.RecordSkinPrice(asset.UUID, costVP)
+		}
+
 		shopSkins = append(shopSkins, models.ResolvedSkin{
 			UUID:          asset.UUID,
 			DisplayName:   asset.DisplayName,
 			Rarity:        RarityNameMap[tierUUID],
-			CostVP:        offer.Cost[vpUUID],
+			CostVP:        costVP,
 			IconURL:       iconURL,
 			FullRenderURL: fullRenderURL,
 			Sprite:        "", // Sprites are rendered dynamically by ShopModel.View() using current terminal width
@@ -888,7 +893,12 @@ func (m MainModel) loadData() tea.Msg {
 
 			iconURL, fullRenderURL := resolveSkinImages(asset)
 
-			cost := bo.Offer.Cost[vpUUID]
+			baseCost := bo.Offer.Cost[vpUUID]
+			if baseCost > 0 {
+				cache.RecordSkinPrice(asset.UUID, baseCost)
+			}
+
+			cost := baseCost
 			if len(bo.DiscountCosts) > 0 && bo.DiscountCosts[vpUUID] > 0 {
 				cost = bo.DiscountCosts[vpUUID]
 			} else if len(bo.DiscountedCost) > 0 && bo.DiscountedCost[vpUUID] > 0 {

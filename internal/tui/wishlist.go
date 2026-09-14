@@ -18,10 +18,11 @@ type WishlistModel struct {
 	wlCursor int
 
 	// Browse section
-	allSkins    []models.SkinAsset // all skins from cache
-	filtered    []models.SkinAsset // filtered by search
-	searchInput string
-	brCursor    int
+	allSkins      []models.SkinAsset // all skins from cache
+	filtered      []models.SkinAsset // filtered by search
+	themeGunTiers map[string]string  // ThemeUUID -> base gun tier UUID
+	searchInput   string
+	brCursor      int
 
 	// UI state
 	focusSection   int // 0 = wishlist section, 1 = browse section
@@ -45,7 +46,45 @@ func (m *WishlistModel) SetNightMarketActive(active bool) {
 
 func (m *WishlistModel) SetAllSkins(skins []models.SkinAsset) {
 	m.allSkins = skins
+	m.themeGunTiers = cache.BuildThemeGunTierMap(skins)
+	m.refreshWishlistPrices()
 	m.filterSkins()
+}
+
+func (m *WishlistModel) refreshWishlistPrices() {
+	if len(m.allSkins) == 0 || len(m.entries) == 0 {
+		return
+	}
+	skinLookup := make(map[string]models.SkinAsset, len(m.allSkins))
+	nameLookup := make(map[string]models.SkinAsset, len(m.allSkins))
+	for _, s := range m.allSkins {
+		skinLookup[s.UUID] = s
+		nameLookup[s.DisplayName] = s
+	}
+
+	updated := false
+	for i := range m.entries {
+		entry := &m.entries[i]
+		s, ok := skinLookup[entry.UUID]
+		if !ok {
+			s, ok = nameLookup[entry.Name]
+		}
+		if ok {
+			newPrice := cache.ResolveSkinPrice(s, m.themeGunTiers)
+			newRarity := cache.ResolveSkinRarity(s, m.themeGunTiers)
+			if newPrice > 0 && entry.CostVP != newPrice {
+				entry.CostVP = newPrice
+				updated = true
+			}
+			if newRarity != "" && entry.Rarity != newRarity {
+				entry.Rarity = newRarity
+				updated = true
+			}
+		}
+	}
+	if updated {
+		_ = cache.SaveWishlist(m.entries)
+	}
 }
 
 func (m *WishlistModel) Refresh() {
@@ -56,6 +95,9 @@ func (m *WishlistModel) Refresh() {
 	}
 	if m.wlCursor < 0 {
 		m.wlCursor = 0
+	}
+	if len(m.themeGunTiers) > 0 {
+		m.refreshWishlistPrices()
 	}
 	m.filterSkins()
 }
@@ -142,33 +184,18 @@ func (m WishlistModel) Update(msg tea.Msg) (WishlistModel, tea.Cmd) {
 			case tea.KeyEnter:
 				if len(m.filtered) > 0 && m.brCursor < len(m.filtered) {
 					selected := m.filtered[m.brCursor]
-					tierUUID := ""
-					if selected.ContentTierUUID != nil {
-						tierUUID = *selected.ContentTierUUID
-					}
 					iconURL := ""
 					if selected.DisplayIcon != nil {
 						iconURL = *selected.DisplayIcon
 					} else if len(selected.Levels) > 0 && selected.Levels[0].DisplayIcon != nil {
 						iconURL = *selected.Levels[0].DisplayIcon
 					}
-					costVP := 0
-					switch RarityNameMap[tierUUID] {
-					case "Select":
-						costVP = 875
-					case "Deluxe":
-						costVP = 1275
-					case "Premium":
-						costVP = 1775
-					case "Exclusive":
-						costVP = 2175
-					case "Ultra":
-						costVP = 2475
-					}
+					costVP := cache.ResolveSkinPrice(selected, m.themeGunTiers)
+					rarity := cache.ResolveSkinRarity(selected, m.themeGunTiers)
 					entry := cache.WishlistEntry{
 						UUID:    selected.UUID,
 						Name:    selected.DisplayName,
-						Rarity:  RarityNameMap[tierUUID],
+						Rarity:  rarity,
 						CostVP:  costVP,
 						IconURL: iconURL,
 					}
@@ -335,29 +362,14 @@ func (m WishlistModel) View() string {
 				cursor = "  ▸ "
 			}
 
-			tierUUID := ""
-			if s.ContentTierUUID != nil {
-				tierUUID = *s.ContentTierUUID
-			}
-			rarity := RarityNameMap[tierUUID]
+			tierUUID := cache.ResolveSkinTierUUID(s, m.themeGunTiers)
+			rarity := cache.ResolveSkinRarity(s, m.themeGunTiers)
 			rarityColor := ColorMuted
 			if c, ok := RarityColorMap[tierUUID]; ok {
 				rarityColor = c
 			}
 
-			costVP := 0
-			switch rarity {
-			case "Select":
-				costVP = 875
-			case "Deluxe":
-				costVP = 1275
-			case "Premium":
-				costVP = 1775
-			case "Exclusive":
-				costVP = 2175
-			case "Ultra":
-				costVP = 2475
-			}
+			costVP := cache.ResolveSkinPrice(s, m.themeGunTiers)
 
 			nameStr := lipgloss.NewStyle().
 				Foreground(ColorFg).
