@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 var (

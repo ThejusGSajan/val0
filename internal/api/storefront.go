@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/val-tracker/val-tracker/internal/auth"
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/auth"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 // FetchStorefront retrieves the daily shop + night market (if active).

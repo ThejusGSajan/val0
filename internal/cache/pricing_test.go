@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 func TestIsMeleeSkin(t *testing.T) {

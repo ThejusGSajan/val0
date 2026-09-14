@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/val-tracker/val-tracker/internal/models"
-	"github.com/val-tracker/val-tracker/internal/sprite"
+	"github.com/ThejusGSajan/val0/internal/models"
+	"github.com/ThejusGSajan/val0/internal/sprite"
 )
 
 type NightMarketModel struct {

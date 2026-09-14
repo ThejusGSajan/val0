@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/val-tracker/val-tracker/internal/launcher"
-	"github.com/val-tracker/val-tracker/internal/tui"
+	"github.com/ThejusGSajan/val0/internal/launcher"
+	"github.com/ThejusGSajan/val0/internal/tui"
 )
 
 var (

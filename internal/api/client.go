@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/val-tracker/val-tracker/internal/auth"
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/auth"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 // The static X-Riot-ClientPlatform header (base64-encoded JSON).

@@ -19,7 +19,7 @@ Tags:
 Installers:
   - Architecture: x64
     InstallerType: portable
-    InstallerUrl: https://github.com/val-tracker/val-tracker/releases/download/v1.0.0/val-tracker.exe
+    InstallerUrl: https://github.com/ThejusGSajan/val0/releases/download/v1.0.0/val-tracker.exe
     InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
     Commands:
       - val-tracker

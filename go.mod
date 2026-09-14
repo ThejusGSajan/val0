@@ -1,4 +1,4 @@
-module github.com/val-tracker/val-tracker
+module github.com/ThejusGSajan/val0
 
 go 1.22.0
 

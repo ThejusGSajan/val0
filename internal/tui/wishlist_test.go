@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/val-tracker/val-tracker/internal/cache"
-	"github.com/val-tracker/val-tracker/internal/models"
-	"github.com/val-tracker/val-tracker/internal/sprite"
+	"github.com/ThejusGSajan/val0/internal/cache"
+	"github.com/ThejusGSajan/val0/internal/models"
+	"github.com/ThejusGSajan/val0/internal/sprite"
 )
 
 func createTestImageServer(t *testing.T) *httptest.Server {

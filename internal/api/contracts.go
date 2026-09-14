@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/val-tracker/val-tracker/internal/cache"
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/cache"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 // FetchContracts retrieves all player contracts (including Battlepass).

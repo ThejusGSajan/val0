@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/val-tracker/val-tracker/internal/models"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 // FetchWallet retrieves VP, Radianite, Kingdom Credits, and Free Agent balances.
