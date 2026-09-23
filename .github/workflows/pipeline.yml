@@ -90,6 +90,25 @@ jobs:
           tag_prefix: 'v'
           release_branches: 'main'
           create_annotated_tag: true
+          custom_release_rules: |
+            breaking:major:Breaking Changes,
+            break:major:Breaking Changes,
+            major:major:Breaking Changes,
+            feat:minor:Features,
+            feature:minor:Features,
+            minor:minor:Features,
+            add:minor:Features,
+            perf:minor:Performance Improvements,
+            fix:patch:Bug Fixes,
+            bugfix:patch:Bug Fixes,
+            bug:patch:Bug Fixes,
+            hotfix:patch:Bug Fixes,
+            patch:patch:Bug Fixes,
+            refactor:patch:Refactoring & Polish,
+            style:patch:UI & Style Improvements,
+            align:patch:UI & Style Improvements,
+            docs:patch:Documentation,
+            chore:patch:Maintenance
 
   # =========================================================================
   # 3. BUILD & DISTRIBUTION: Cross-Compile, Checksum & Release
