@@ -1799,3 +1799,160 @@ func TestStatsModel_CasualModesFiltered(t *testing.T) {
 	}
 }
 
+func TestNightMarketModel_2Col_Alignment(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{UUID: "nm-1", DisplayName: "Prime Vandal", Rarity: "Select", CostVP: 1775},
+		{UUID: "nm-2", DisplayName: "Reaver Phantom", Rarity: "Premium", CostVP: 1775},
+		{UUID: "nm-3", DisplayName: "Sovereign Sword", Rarity: "Exclusive", CostVP: 3550},
+		{UUID: "nm-4", DisplayName: "Ion Sheriff", Rarity: "Premium", CostVP: 1775},
+		{UUID: "nm-5", DisplayName: "Glitchpop Dagger", Rarity: "Exclusive", CostVP: 4350},
+		{UUID: "nm-6", DisplayName: "Magepunk Ghost", Rarity: "Premium", CostVP: 1775},
+	}
+	discounts := []int{10, 20, 30, 40, 45, 50}
+
+	m := NewNightMarketModel(skins, discounts)
+	m.SetSize(120, 40) // width 120 < 140 triggers 2-column layout
+	view := m.View()
+
+	// Verify all skin names and discounts are present
+	for _, skin := range skins {
+		if !strings.Contains(view, skin.DisplayName) {
+			t.Errorf("expected view to contain %q", skin.DisplayName)
+		}
+	}
+	for _, disc := range discounts {
+		discStr := fmt.Sprintf("-%d%%", disc)
+		if !strings.Contains(view, discStr) {
+			t.Errorf("expected view to contain discount %q", discStr)
+		}
+	}
+
+	// In Lipgloss, Width(cardContentWidth) includes padding (0,1), plus 2 border columns.
+	// Outer card width = cardContentWidth + 2 = 42.
+	// Row width with 1 spacer = 2 * 42 + 1 = 85.
+	expectedRowWidth := 2*(40+2) + 1
+	lines := strings.Split(view, "\n")
+	matchingLineCount := 0
+	for _, line := range lines {
+		w := lipgloss.Width(line)
+		if w == expectedRowWidth {
+			matchingLineCount++
+		}
+	}
+	// 3 rows * 11 lines per card = 33 lines
+	if matchingLineCount != 33 {
+		t.Errorf("expected 33 grid lines with width %d (3 rows of 2 cards), got %d", expectedRowWidth, matchingLineCount)
+	}
+}
+
+func TestNightMarketModel_3Col_Alignment(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{UUID: "nm-1", DisplayName: "Prime Vandal", Rarity: "Select", CostVP: 1775},
+		{UUID: "nm-2", DisplayName: "Reaver Phantom", Rarity: "Premium", CostVP: 1775},
+		{UUID: "nm-3", DisplayName: "Sovereign Sword", Rarity: "Exclusive", CostVP: 3550},
+		{UUID: "nm-4", DisplayName: "Ion Sheriff", Rarity: "Premium", CostVP: 1775},
+		{UUID: "nm-5", DisplayName: "Glitchpop Dagger", Rarity: "Exclusive", CostVP: 4350},
+		{UUID: "nm-6", DisplayName: "Magepunk Ghost", Rarity: "Premium", CostVP: 1775},
+	}
+	discounts := []int{10, 20, 30, 40, 45, 50}
+
+	m := NewNightMarketModel(skins, discounts)
+	m.SetSize(160, 40) // width 160 >= 140 triggers 3-column layout
+	view := m.View()
+
+	// Verify all 6 skins render properly without line overflow
+	for _, skin := range skins {
+		if !strings.Contains(view, skin.DisplayName) {
+			t.Errorf("expected view to contain %q", skin.DisplayName)
+		}
+	}
+	for _, disc := range discounts {
+		discStr := fmt.Sprintf("-%d%%", disc)
+		if !strings.Contains(view, discStr) {
+			t.Errorf("expected view to contain discount %q", discStr)
+		}
+	}
+
+	// In 3-col mode at width 160: cardContentWidth = 40.
+	// Outer card width = 40 + 2 = 42.
+	// Row width with 2 spacers = 3 * 42 + 2 = 128.
+	expectedRowWidth := 3*(40+2) + 2
+	lines := strings.Split(view, "\n")
+	matchingLineCount := 0
+	for _, line := range lines {
+		w := lipgloss.Width(line)
+		if w == expectedRowWidth {
+			matchingLineCount++
+		}
+	}
+	// 2 rows * 11 lines per card = 22 lines
+	if matchingLineCount != 22 {
+		t.Errorf("expected 22 grid lines with width %d (2 rows of 3 cards), got %d", expectedRowWidth, matchingLineCount)
+	}
+}
+
+func TestNightMarketModel_WishlistBadge(t *testing.T) {
+	skin := models.ResolvedSkin{
+		UUID:        "nm-wishlist-uuid",
+		DisplayName: "Araxys Vandal",
+		Rarity:      "Exclusive",
+		CostVP:      2175,
+	}
+	_ = cache.AddToWishlist(cache.ConvertResolvedSkinToWishlist(skin))
+	defer cache.RemoveFromWishlist(skin.UUID)
+
+	m := NewNightMarketModel([]models.ResolvedSkin{skin}, []int{30})
+	m.SetSize(120, 30)
+	view := m.View()
+
+	if !strings.Contains(view, "WISHLIST ITEM") {
+		t.Errorf("expected view to contain 'WISHLIST ITEM' badge, got:\n%s", view)
+	}
+}
+
+func TestNightMarketModel_BreakpointThreshold(t *testing.T) {
+	skins := []models.ResolvedSkin{
+		{UUID: "nm-1", DisplayName: "Prime Vandal", CostVP: 1775},
+		{UUID: "nm-2", DisplayName: "Reaver Phantom", CostVP: 1775},
+		{UUID: "nm-3", DisplayName: "Sovereign Sword", CostVP: 3550},
+		{UUID: "nm-4", DisplayName: "Ion Sheriff", CostVP: 1775},
+		{UUID: "nm-5", DisplayName: "Glitchpop Dagger", CostVP: 4350},
+		{UUID: "nm-6", DisplayName: "Magepunk Ghost", CostVP: 1775},
+	}
+	discounts := []int{10, 20, 30, 40, 45, 50}
+
+	// Width 139 (< 140) -> 2 columns (3 rows of 2 cards)
+	m139 := NewNightMarketModel(skins, discounts)
+	m139.SetSize(139, 40)
+	view139 := m139.View()
+	// At width 139, cardContentWidth = (139 / 2) - 8 = 69 - 8 = 61 -> capped at 40
+	// Card width = 42, row width = 2 * 42 + 1 = 85
+	width139Count := 0
+	for _, line := range strings.Split(view139, "\n") {
+		if lipgloss.Width(line) == 85 {
+			width139Count++
+		}
+	}
+	if width139Count != 33 {
+		t.Errorf("expected 33 lines of width 85 for 2-column layout at width 139, got %d", width139Count)
+	}
+
+	// Width 140 (>= 140) -> 3 columns (2 rows of 3 cards)
+	m140 := NewNightMarketModel(skins, discounts)
+	m140.SetSize(140, 40)
+	view140 := m140.View()
+	// At width 140, cardContentWidth = (140 / 3) - 8 = 46 - 8 = 38
+	// Card width = 38 + 2 = 40, row width = 3 * 40 + 2 = 122
+	expectedRowWidth140 := 3*(38+2) + 2
+	width140Count := 0
+	for _, line := range strings.Split(view140, "\n") {
+		if lipgloss.Width(line) == expectedRowWidth140 {
+			width140Count++
+		}
+	}
+	if width140Count != 22 {
+		t.Errorf("expected 22 lines of width %d for 3-column layout at width 140, got %d", expectedRowWidth140, width140Count)
+	}
+}
+
+
