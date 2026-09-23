@@ -47,13 +47,14 @@ func (m NightMarketModel) View() string {
 		Bold(true).
 		Render("  ✦ NIGHT MARKET ✦")
 
-	cols := 2
-	if m.width >= 140 {
-		cols = 3
+	minWidthFor3Col := 98
+	cols := 3
+	if m.width > 0 && m.width < minWidthFor3Col {
+		cols = 2
 	}
 	cardContentWidth := 40
 	if m.width > 0 {
-		cardContentWidth = (m.width / cols) - 8
+		cardContentWidth = (m.width - (3*cols - 1)) / cols
 	}
 	if cardContentWidth > 40 {
 		cardContentWidth = 40
@@ -76,9 +77,6 @@ func (m NightMarketModel) View() string {
 		}
 		colIdx := i % cols
 		offsetX := 0
-		if colIdx == cols-1 {
-			offsetX = -2
-		}
 		inWishlist := cache.IsInWishlist(skin.UUID)
 		rendered, overlay := renderSkinCardWithWishlist(skin, disc, cardContentWidth, inWishlist, offsetX)
 		cardsWithOverlay = append(cardsWithOverlay, cardWithOverlay{
@@ -118,7 +116,7 @@ func (m NightMarketModel) View() string {
 		linesUp := totalLines - 3
 
 		numCardsInRow := len(rowCards)
-		totalGridRowWidth := numCardsInRow*(cardContentWidth+4) + (numCardsInRow - 1)
+		totalGridRowWidth := numCardsInRow*(cardContentWidth+2) + (numCardsInRow - 1)
 		wipeCols := 120
 		trailingWipe := fmt.Sprintf("\x1b[48;2;13;15;23m\x1b[K%s\x1b[%dG", strings.Repeat(" ", wipeCols), totalGridRowWidth+1)
 
@@ -131,8 +129,8 @@ func (m NightMarketModel) View() string {
 
 		for colIdx, c := range rowCards {
 			if c.overlay != nil {
-				spriteMarginNM := (cardContentWidth - c.overlay.ContentWidth) / 2
-				colOffset := colIdx*(cardContentWidth+5) + 2 + spriteMarginNM + c.overlay.OffsetX
+				spriteMarginNM := ((cardContentWidth - 2) - c.overlay.ContentWidth) / 2
+				colOffset := colIdx*(cardContentWidth+3) + 2 + spriteMarginNM + c.overlay.OffsetX
 				wipe := buildWipeSeq(colOffset, c.overlay.ContentWidth, c.overlay.SpriteRows)
 				tw := ""
 				if colIdx == lastOverlayIdx {

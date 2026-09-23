@@ -1811,7 +1811,7 @@ func TestNightMarketModel_2Col_Alignment(t *testing.T) {
 	discounts := []int{10, 20, 30, 40, 45, 50}
 
 	m := NewNightMarketModel(skins, discounts)
-	m.SetSize(120, 40) // width 120 < 140 triggers 2-column layout
+	m.SetSize(90, 40) // width 90 < 98 triggers 2-column layout
 	view := m.View()
 
 	// Verify all skin names and discounts are present
@@ -1921,37 +1921,54 @@ func TestNightMarketModel_BreakpointThreshold(t *testing.T) {
 	}
 	discounts := []int{10, 20, 30, 40, 45, 50}
 
-	// Width 139 (< 140) -> 2 columns (3 rows of 2 cards)
-	m139 := NewNightMarketModel(skins, discounts)
-	m139.SetSize(139, 40)
-	view139 := m139.View()
-	// At width 139, cardContentWidth = (139 / 2) - 8 = 69 - 8 = 61 -> capped at 40
+	// Width 97 (< 98) -> 2 columns (3 rows of 2 cards)
+	m97 := NewNightMarketModel(skins, discounts)
+	m97.SetSize(97, 40)
+	view97 := m97.View()
+	// At width 97, cardContentWidth = (97 - 5) / 2 = 46 -> clamped to 40
 	// Card width = 42, row width = 2 * 42 + 1 = 85
-	width139Count := 0
-	for _, line := range strings.Split(view139, "\n") {
+	width97Count := 0
+	for _, line := range strings.Split(view97, "\n") {
 		if lipgloss.Width(line) == 85 {
-			width139Count++
+			width97Count++
 		}
 	}
-	if width139Count != 33 {
-		t.Errorf("expected 33 lines of width 85 for 2-column layout at width 139, got %d", width139Count)
+	if width97Count != 33 {
+		t.Errorf("expected 33 lines of width 85 for 2-column layout at width 97, got %d", width97Count)
 	}
 
-	// Width 140 (>= 140) -> 3 columns (2 rows of 3 cards)
-	m140 := NewNightMarketModel(skins, discounts)
-	m140.SetSize(140, 40)
-	view140 := m140.View()
-	// At width 140, cardContentWidth = (140 / 3) - 8 = 46 - 8 = 38
-	// Card width = 38 + 2 = 40, row width = 3 * 40 + 2 = 122
-	expectedRowWidth140 := 3*(38+2) + 2
-	width140Count := 0
-	for _, line := range strings.Split(view140, "\n") {
-		if lipgloss.Width(line) == expectedRowWidth140 {
-			width140Count++
+	// Width 98 (>= 98) -> 3 columns (2 rows of 3 cards)
+	m98 := NewNightMarketModel(skins, discounts)
+	m98.SetSize(98, 40)
+	view98 := m98.View()
+	// At width 98, cardContentWidth = (98 - 8) / 3 = 30
+	// Card width = 30 + 2 = 32, row width = 3 * 32 + 2 = 98
+	expectedRowWidth98 := 3*(30+2) + 2
+	width98Count := 0
+	for _, line := range strings.Split(view98, "\n") {
+		if lipgloss.Width(line) == expectedRowWidth98 {
+			width98Count++
 		}
 	}
-	if width140Count != 22 {
-		t.Errorf("expected 22 lines of width %d for 3-column layout at width 140, got %d", expectedRowWidth140, width140Count)
+	if width98Count != 22 {
+		t.Errorf("expected 22 lines of width %d for 3-column layout at width 98, got %d", expectedRowWidth98, width98Count)
+	}
+
+	// Width 120 (14-inch laptop viewport) -> 3 columns (2 rows of 3 cards)
+	m120 := NewNightMarketModel(skins, discounts)
+	m120.SetSize(120, 40)
+	view120 := m120.View()
+	// At width 120, cardContentWidth = (120 - 8) / 3 = 37
+	// Card width = 37 + 2 = 39, row width = 3 * 39 + 2 = 119
+	expectedRowWidth120 := 3*(37+2) + 2
+	width120Count := 0
+	for _, line := range strings.Split(view120, "\n") {
+		if lipgloss.Width(line) == expectedRowWidth120 {
+			width120Count++
+		}
+	}
+	if width120Count != 22 {
+		t.Errorf("expected 22 lines of width %d for 3-column layout at width 120, got %d", expectedRowWidth120, width120Count)
 	}
 }
 
