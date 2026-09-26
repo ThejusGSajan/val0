@@ -18,13 +18,13 @@ const (
 )
 
 // cacheDir returns the path to our cache directory inside the user's config dir.
-// On Windows: %AppData%\val-tracker\
+// On Windows: %AppData%\val0\
 func cacheDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "val-tracker")
+	dir := filepath.Join(base, "val0")
 	return dir, os.MkdirAll(dir, 0o755)
 }
 

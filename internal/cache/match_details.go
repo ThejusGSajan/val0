@@ -33,7 +33,7 @@ func matchCacheDir() (string, error) {
 }
 
 // matchCacheFilePath returns the path to a cached match details file.
-// On Windows: %AppData%\val-tracker\matches\<matchID>.json
+// On Windows: %AppData%\val0\matches\<matchID>.json
 func matchCacheFilePath(matchID string) (string, error) {
 	dir, err := matchCacheDir()
 	if err != nil {
