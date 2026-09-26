@@ -155,9 +155,13 @@ func (m MatchesModel) renderListView() string {
 			Render(fmt.Sprintf("%-12s", truncate(item.QueueName, 12)))
 
 		// Agent
+		agentName := item.AgentName
+		if item.Details != nil && item.Details.IsGauntlet() {
+			agentName = "-"
+		}
 		agentStr := lipgloss.NewStyle().
 			Foreground(ColorSelect).
-			Render(fmt.Sprintf("%-9s", truncate(item.AgentName, 9)))
+			Render(fmt.Sprintf("%-9s", truncate(agentName, 9)))
 
 		// Score
 		scoreStr := lipgloss.NewStyle().
@@ -231,10 +235,11 @@ func (m MatchesModel) renderDetailView() string {
 	var sb strings.Builder
 
 	isDeathmatch := strings.EqualFold(item.QueueName, "Deathmatch") || (d != nil && d.IsDeathmatch())
+	isGauntlet := strings.EqualFold(item.QueueName, "Gauntlet") || (d != nil && d.IsGauntlet())
 
 	outcome := item.Outcome
 	score := item.Score
-	if isDeathmatch && d != nil {
+	if (isDeathmatch || isGauntlet) && d != nil {
 		if score == "" || score == "0-0" {
 			score = d.ScoreString(m.playerPUUID)
 		}
@@ -263,6 +268,8 @@ func (m MatchesModel) renderDetailView() string {
 
 	if isDeathmatch {
 		sb.WriteString(m.renderDeathmatchTable(d))
+	} else if isGauntlet {
+		sb.WriteString(m.renderGauntletScoreboard(d))
 	} else {
 		myTeam := d.GetPlayerTeam(m.playerPUUID)
 		myTeamID := "Blue"
@@ -284,7 +291,9 @@ func (m MatchesModel) renderDetailView() string {
 		sb.WriteString("\n")
 
 		// Render Round Timeline
-		sb.WriteString(m.renderRoundTimeline(d, myTeamID))
+		if !isDeathmatch && !isGauntlet {
+			sb.WriteString(m.renderRoundTimeline(d, myTeamID))
+		}
 	}
 
 	sb.WriteString("\n\n  " + RenderKeyItem("esc", "return to match list"))
@@ -347,12 +356,7 @@ func (m MatchesModel) renderTeamTable(d *models.MatchDetails, teamID string, isM
 				name = "<Hidden>"
 			}
 
-			agentName := "Agent"
-			if m.agentsMap != nil {
-				if a, ok := m.agentsMap[strings.ToLower(p.CharacterID)]; ok {
-					agentName = a
-				}
-			}
+			agentName := ResolveAgentDisplayName(p.CharacterID, m.agentsMap, d)
 
 			acs, adr, hsPct, econ := d.ComputePlayerAdvancedStats(p.Subject)
 			rows = append(rows, teamPlayerRow{
@@ -419,12 +423,7 @@ func (m MatchesModel) renderDeathmatchTable(d *models.MatchDetails) string {
 			name = "<Hidden>"
 		}
 
-		agentName := "Agent"
-		if m.agentsMap != nil {
-			if a, ok := m.agentsMap[strings.ToLower(p.CharacterID)]; ok {
-				agentName = a
-			}
-		}
+		agentName := ResolveAgentDisplayName(p.CharacterID, m.agentsMap, d)
 
 		playerRow := fmt.Sprintf("  %s  %s  %3d %3d %3d",
 			fitWidth(name, 18),
@@ -437,6 +436,101 @@ func (m MatchesModel) renderDeathmatchTable(d *models.MatchDetails) string {
 		}
 		sb.WriteString(playerRow + "\n")
 	}
+	return sb.String()
+}
+
+func (m MatchesModel) renderGauntletScoreboard(d *models.MatchDetails) string {
+	var sb strings.Builder
+	leaderboard := d.GetGauntletLeaderboard(m.playerPUUID)
+
+	for _, entry := range leaderboard {
+		ordinal := models.FormatOrdinal(entry.Rank)
+		teamLabel := fmt.Sprintf("  %s — %s TEAM", ordinal, strings.ToUpper(entry.Team.TeamID))
+		if entry.IsMyTeam {
+			teamLabel += " (YOUR TEAM)"
+		}
+
+		teamColor := lipgloss.Color("#EF4444") // Red for opponent teams
+		if entry.Rank == 1 {
+			teamColor = lipgloss.Color("#F59E0B") // Gold for 1st place
+		} else if entry.IsMyTeam {
+			teamColor = lipgloss.Color("#5A9FE2") // Blue for user's team
+		}
+
+		header := lipgloss.NewStyle().Foreground(teamColor).Bold(true).Render(teamLabel) +
+			lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf(" — %d rounds", entry.Team.RoundsWon))
+		sb.WriteString(header + "\n")
+
+		headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s",
+			"Player", "Agent", "ACS", "K", "D", "A", "HS%", "ADR", "Econ")
+		sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow) + "\n")
+		sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
+
+		type playerRow struct {
+			player models.MatchPlayer
+			acs    int
+			adr    int
+			hsPct  int
+			econ   int
+			name   string
+		}
+
+		rows := make([]playerRow, 0, len(entry.Players))
+		for _, p := range entry.Players {
+			name := ""
+			if p.Subject == m.playerPUUID {
+				name = "▸ You"
+			} else if p.GameName != "" {
+				if p.TagLine != "" {
+					name = fmt.Sprintf("%s#%s", p.GameName, p.TagLine)
+				} else {
+					name = p.GameName
+				}
+			} else {
+				name = "<Hidden>"
+			}
+
+			acs, adr, hsPct, econ := d.ComputePlayerAdvancedStats(p.Subject)
+			rows = append(rows, playerRow{
+				player: p,
+				acs:    acs,
+				adr:    adr,
+				hsPct:  hsPct,
+				econ:   econ,
+				name:   name,
+			})
+		}
+
+		sort.SliceStable(rows, func(i, j int) bool {
+			if rows[i].acs != rows[j].acs {
+				return rows[i].acs > rows[j].acs
+			}
+			return rows[i].player.Stats.Kills > rows[j].player.Stats.Kills
+		})
+
+		for _, r := range rows {
+			agentName := ResolveAgentDisplayName(r.player.CharacterID, m.agentsMap, d)
+			pName := truncate(r.name, 18)
+			nameColor := ColorFg
+			if r.player.Subject == m.playerPUUID {
+				nameColor = ColorSelect
+			}
+
+			sb.WriteString(fmt.Sprintf("  %-18s  %-9s  %3d  %3d %3d %3d   %3d%%   %4d   %4d\n",
+				lipgloss.NewStyle().Foreground(nameColor).Render(fmt.Sprintf("%-18s", pName)),
+				lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf("%-9s", agentName)),
+				r.acs,
+				r.player.Stats.Kills,
+				r.player.Stats.Deaths,
+				r.player.Stats.Assists,
+				r.hsPct,
+				r.adr,
+				r.econ,
+			))
+		}
+		sb.WriteString("\n")
+	}
+
 	return sb.String()
 }
 

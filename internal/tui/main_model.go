@@ -1065,7 +1065,7 @@ func (m MainModel) loadData() tea.Msg {
 				item.Score = d.ScoreString(m.session.PUUID)
 
 				if p := d.GetPlayer(m.session.PUUID); p != nil {
-					item.AgentName = cache.GetAgentName(p.CharacterID, agentsMap)
+					item.AgentName = ResolveAgentDisplayName(p.CharacterID, agentsMap, d)
 					item.Kills = p.Stats.Kills
 					item.Deaths = p.Stats.Deaths
 					item.Assists = p.Stats.Assists

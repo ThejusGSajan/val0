@@ -1972,4 +1972,157 @@ func TestNightMarketModel_BreakpointThreshold(t *testing.T) {
 	}
 }
 
+func TestResolveQueueDisplayName_Gauntlet(t *testing.T) {
+	if name := ResolveQueueDisplayName("abilitydraftarena", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(abilitydraftarena) = %q, want 'Gauntlet'", name)
+	}
+	if name := ResolveQueueDisplayName("abilitydraft", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(abilitydraft) = %q, want 'Gauntlet'", name)
+	}
+	if name := ResolveQueueDisplayName("gauntlet", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(gauntlet) = %q, want 'Gauntlet'", name)
+	}
+}
+
+func TestResolveAgentDisplayName_Gauntlet(t *testing.T) {
+	md := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{QueueID: "abilitydraftarena"},
+	}
+	agentsMap := map[string]string{"dade69b4-4f5a-8528-247b-219e5a1facd6": "Fade"}
+	if name := ResolveAgentDisplayName("dade69b4-4f5a-8528-247b-219e5a1facd6", agentsMap, md); name != "-" {
+		t.Errorf("expected '-', got %q", name)
+	}
+}
+
+func TestMatchesModel_GauntletDetailView(t *testing.T) {
+	teams := make([]models.MatchTeam, 8)
+	players := make([]models.MatchPlayer, 16)
+	for i := 0; i < 8; i++ {
+		tID := fmt.Sprintf("Team_%d", i+1)
+		won := (i == 3)
+		rounds := 0
+		if won {
+			rounds = 8
+		}
+		teams[i] = models.MatchTeam{TeamID: tID, Won: won, RoundsWon: rounds}
+		players[i*2] = models.MatchPlayer{
+			Subject:  fmt.Sprintf("player-%d-a", i+1),
+			TeamID:   tID,
+			GameName: fmt.Sprintf("Player%d", i+1),
+		}
+		players[i*2+1] = models.MatchPlayer{
+			Subject:  fmt.Sprintf("player-%d-b", i+1),
+			TeamID:   tID,
+			GameName: fmt.Sprintf("Partner%d", i+1),
+		}
+	}
+
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID: "gauntlet-1",
+			QueueID: "abilitydraftarena",
+			MapID:   "/Game/Maps/Gauntlet/Gauntlet",
+		},
+		Teams:   teams,
+		Players: players,
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-1",
+		MapName:     "Gauntlet",
+		QueueName:   ResolveQueueDisplayName("abilitydraftarena", ""),
+		Outcome:     details.GetMatchOutcome("player-6-a"),
+		Score:       details.ScoreString("player-6-a"),
+		Details:     details,
+		PlayerPUUID: "player-6-a",
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "player-6-a", nil, nil)
+	m.SetSize(120, 40)
+
+	// Enter detail view
+	detailModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view := detailModel.View()
+
+	// Verify Header does NOT contain 0-0 and contains LOSS
+	if strings.Contains(view, "LOSS  0-0") {
+		t.Errorf("header must NOT contain 'LOSS  0-0', got:\n%s", view)
+	}
+	if !strings.Contains(view, "MATCH DETAIL — Gauntlet (Gauntlet)") {
+		t.Errorf("header missing title, got:\n%s", view)
+	}
+
+	// Verify all 8 teams are rendered
+	for i := 1; i <= 8; i++ {
+		expectedTeam := fmt.Sprintf("TEAM_%d TEAM", i)
+		if !strings.Contains(view, expectedTeam) {
+			t.Errorf("expected view to contain %s, got:\n%s", expectedTeam, view)
+		}
+	}
+
+	// Verify agent shows '-' and never 'Agent' in player rows
+	if !strings.Contains(view, " - ") {
+		t.Errorf("detail scoreboard should display '-' for agent, got:\n%s", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		// Skip table header row
+		if strings.Contains(line, "Player") && strings.Contains(line, "Agent") && strings.Contains(line, "ACS") {
+			continue
+		}
+		if strings.Contains(line, " Agent ") {
+			t.Errorf("detail scoreboard row should NOT display 'Agent', got:\n%s", line)
+		}
+	}
+}
+
+func TestMatchesModel_GauntletListView(t *testing.T) {
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID: "gauntlet-1",
+			QueueID: "abilitydraftarena",
+			MapID:   "/Game/Maps/Gauntlet/Gauntlet",
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Team_1", Won: true, RoundsWon: 8},
+			{TeamID: "Team_6", Won: false, RoundsWon: 0},
+		},
+		Players: []models.MatchPlayer{
+			{Subject: "player-6-a", TeamID: "Team_6", Stats: models.PlayerStats{Kills: 5, Deaths: 6, Assists: 2}},
+			{Subject: "player-1-a", TeamID: "Team_1", Stats: models.PlayerStats{Kills: 15, Deaths: 2, Assists: 4}},
+		},
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-1",
+		MapName:     "Gauntlet",
+		QueueName:   ResolveQueueDisplayName("abilitydraftarena", ""),
+		AgentName:   ResolveAgentDisplayName("non-agent-uuid", nil, details),
+		Outcome:     details.GetMatchOutcome("player-6-a"),
+		Score:       details.ScoreString("player-6-a"),
+		Details:     details,
+		PlayerPUUID: "player-6-a",
+		Kills:       5,
+		Deaths:      6,
+		Assists:     2,
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "player-6-a", nil, nil)
+	m.SetSize(120, 40)
+	listView := m.renderListView()
+
+	if !strings.Contains(listView, "Gauntlet") {
+		t.Errorf("expected list view to contain 'Gauntlet', got:\n%s", listView)
+	}
+	if strings.Contains(listView, "Abilitydra..") {
+		t.Errorf("list view should not truncate queue to 'Abilitydra..', got:\n%s", listView)
+	}
+	if strings.Contains(listView, "Agent") {
+		t.Errorf("list view should not display 'Agent', got:\n%s", listView)
+	}
+	if !strings.Contains(listView, "2nd") {
+		t.Errorf("expected list view to contain '2nd' finish, got:\n%s", listView)
+	}
+}
+
+
 

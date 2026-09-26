@@ -164,6 +164,134 @@ func (m *MatchDetails) GetOpponentTeam(playerTeamID string) *MatchTeam {
 	return nil
 }
 
+// IsGauntletMode returns true if the queue or game mode represents Gauntlet (Ability Draft Arena).
+func IsGauntletMode(queueID, gameMode string) bool {
+	q := strings.ToLower(strings.TrimSpace(queueID))
+	gm := strings.ToLower(strings.TrimSpace(gameMode))
+	return q == "abilitydraftarena" || q == "abilitydraft" || q == "gauntlet" ||
+		strings.Contains(gm, "abilitydraftarena") || strings.Contains(gm, "abilitydraft") || strings.Contains(gm, "gauntlet")
+}
+
+// IsGauntlet returns true if this match is a Gauntlet / Ability Draft Arena match.
+func (m *MatchDetails) IsGauntlet() bool {
+	if m == nil {
+		return false
+	}
+	return IsGauntletMode(m.MatchInfo.QueueID, m.MatchInfo.GameMode)
+}
+
+// IsAbilityDraft is an alias for IsGauntlet.
+func (m *MatchDetails) IsAbilityDraft() bool {
+	return m.IsGauntlet()
+}
+
+// GauntletTeamEntry represents a consolidated team entry in a Gauntlet match with aggregated stats.
+type GauntletTeamEntry struct {
+	Team         MatchTeam
+	Players      []MatchPlayer
+	Rank         int
+	TotalScore   int
+	TotalKills   int
+	TotalDeaths  int
+	TotalAssists int
+	IsMyTeam     bool
+}
+
+// GetGauntletLeaderboard calculates and returns all teams sorted 1st through 8th according to Gauntlet ranking rules.
+func (m *MatchDetails) GetGauntletLeaderboard(myPUUID string) []GauntletTeamEntry {
+	if m == nil || len(m.Teams) == 0 {
+		return nil
+	}
+
+	teamMap := make(map[string]*GauntletTeamEntry)
+	for _, t := range m.Teams {
+		teamMap[strings.ToUpper(t.TeamID)] = &GauntletTeamEntry{
+			Team:    t,
+			Players: make([]MatchPlayer, 0, 2),
+		}
+	}
+
+	for _, p := range m.Players {
+		tID := strings.ToUpper(p.TeamID)
+		entry, ok := teamMap[tID]
+		if !ok {
+			entry = &GauntletTeamEntry{
+				Team:    MatchTeam{TeamID: p.TeamID},
+				Players: make([]MatchPlayer, 0, 2),
+			}
+			teamMap[tID] = entry
+		}
+		entry.Players = append(entry.Players, p)
+		entry.TotalScore += p.Stats.Score
+		entry.TotalKills += p.Stats.Kills
+		entry.TotalDeaths += p.Stats.Deaths
+		entry.TotalAssists += p.Stats.Assists
+		if p.Subject == myPUUID && myPUUID != "" {
+			entry.IsMyTeam = true
+		}
+	}
+
+	entries := make([]GauntletTeamEntry, 0, len(teamMap))
+	for _, entry := range teamMap {
+		entries = append(entries, *entry)
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		// 1. Match Won flag
+		if entries[i].Team.Won != entries[j].Team.Won {
+			return entries[i].Team.Won
+		}
+		// 2. Rounds Won
+		if entries[i].Team.RoundsWon != entries[j].Team.RoundsWon {
+			return entries[i].Team.RoundsWon > entries[j].Team.RoundsWon
+		}
+		// 3. Rounds Played
+		if entries[i].Team.RoundsPlayed != entries[j].Team.RoundsPlayed {
+			return entries[i].Team.RoundsPlayed > entries[j].Team.RoundsPlayed
+		}
+		// 4. Total Combat Score
+		if entries[i].TotalScore != entries[j].TotalScore {
+			return entries[i].TotalScore > entries[j].TotalScore
+		}
+		// 5. Total Kills
+		if entries[i].TotalKills != entries[j].TotalKills {
+			return entries[i].TotalKills > entries[j].TotalKills
+		}
+		// 6. Total Deaths (ascending)
+		if entries[i].TotalDeaths != entries[j].TotalDeaths {
+			return entries[i].TotalDeaths < entries[j].TotalDeaths
+		}
+		// 7. Total Assists
+		if entries[i].TotalAssists != entries[j].TotalAssists {
+			return entries[i].TotalAssists > entries[j].TotalAssists
+		}
+		// 8. Deterministic fallback: TeamID
+		return entries[i].Team.TeamID < entries[j].Team.TeamID
+	})
+
+	for i := range entries {
+		entries[i].Rank = i + 1
+	}
+
+	return entries
+}
+
+// GetGauntletRank returns the 1-based team placement (1 to 8) of a player in Gauntlet.
+func (m *MatchDetails) GetGauntletRank(puuid string) int {
+	if m == nil || puuid == "" {
+		return 0
+	}
+	leaderboard := m.GetGauntletLeaderboard(puuid)
+	for _, entry := range leaderboard {
+		for _, p := range entry.Players {
+			if p.Subject == puuid {
+				return entry.Rank
+			}
+		}
+	}
+	return 0
+}
+
 // IsDeathmatch returns true if the match is a Free-For-All Deathmatch (excluding Team Deathmatch / Hurm).
 func (m *MatchDetails) IsDeathmatch() bool {
 	if m == nil {
@@ -178,19 +306,19 @@ func (m *MatchDetails) IsDeathmatch() bool {
 }
 
 // IsCasualMode returns true if the match is a casual or non-structured mode
-// (Free-For-All Deathmatch, Team Deathmatch / Hurm, Escalation / GGTeam, Skirmish, or Snowball Fight)
+// (Free-For-All Deathmatch, Team Deathmatch / Hurm, Escalation / GGTeam, Skirmish, Snowball Fight, or Gauntlet)
 // which should not contribute to tactical/competitive agent performance metrics.
 func (m *MatchDetails) IsCasualMode() bool {
 	if m == nil {
 		return false
 	}
-	if m.IsDeathmatch() {
+	if m.IsDeathmatch() || m.IsGauntlet() {
 		return true
 	}
 	queue := strings.ToLower(m.MatchInfo.QueueID)
 	mode := strings.ToLower(m.MatchInfo.GameMode)
 
-	casualIdentifiers := []string{"deathmatch", "hurm", "ggteam", "skirmish", "snowball"}
+	casualIdentifiers := []string{"deathmatch", "hurm", "ggteam", "skirmish", "snowball", "abilitydraftarena", "abilitydraft", "gauntlet"}
 	for _, id := range casualIdentifiers {
 		if queue == id || strings.Contains(mode, id) {
 			return true
@@ -293,6 +421,17 @@ func (m *MatchDetails) GetMatchOutcome(puuid string) string {
 		return "DRAW"
 	}
 
+	if m.IsGauntlet() {
+		rank := m.GetGauntletRank(puuid)
+		if rank == 1 {
+			return "WIN"
+		}
+		if rank > 1 {
+			return "LOSS"
+		}
+		return "DRAW"
+	}
+
 	myTeam := m.GetPlayerTeam(puuid)
 	if myTeam == nil {
 		return "DRAW"
@@ -318,6 +457,14 @@ func (m *MatchDetails) GetMatchOutcome(puuid string) string {
 func (m *MatchDetails) ScoreString(puuid string) string {
 	if m.IsDeathmatch() {
 		rank := m.GetDeathmatchRank(puuid)
+		if rank > 0 {
+			return FormatOrdinal(rank)
+		}
+		return "0-0"
+	}
+
+	if m.IsGauntlet() {
+		rank := m.GetGauntletRank(puuid)
 		if rank > 0 {
 			return FormatOrdinal(rank)
 		}
