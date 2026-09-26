@@ -2216,5 +2216,93 @@ func TestMatchesModel_GauntletListView(t *testing.T) {
 	}
 }
 
+func TestStatsModel_WeaponClassification(t *testing.T) {
+	puUID := "test-player-puuid"
+
+	match := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-tactical-weapons",
+			QueueID:  "competitive",
+			GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				TeamID:      "Blue",
+				CharacterID: "agent-jett",
+				Stats: models.PlayerStats{
+					Score:        3000,
+					RoundsPlayed: 10,
+					Kills:        4,
+					Deaths:       2,
+					Assists:      1,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+			{TeamID: "Red", Won: false, RoundsWon: 7},
+		},
+		RoundResults: []models.RoundResult{
+			{
+				PlayerStats: []models.RoundPlayerStat{
+					{
+						Subject: puUID,
+						Kills: []models.RoundKill{
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "5f0786ac-4366-2d39-96bd-2586c6734f07", // Outlaw
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "8db0a1bf-4a50-832a-4566-faaaa6d250ca", // Warden
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "Ability_GrenadeWeapon_C", // Ability (no dashes)
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "11111111-2222-3333-4444-555555555555", // Unknown Weapon (with dashes)
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	sm := NewStatsModel([]*models.MatchDetails{match}, puUID, nil, nil, nil, "Diamond 1")
+
+	expectedWeapons := map[string]int{
+		"Outlaw":         1,
+		"Warden":         1,
+		"Ability":        1,
+		"Unknown Weapon": 1,
+	}
+
+	if len(sm.weaponStats) != 4 {
+		t.Fatalf("expected 4 weapon stats, got %d", len(sm.weaponStats))
+	}
+
+	for _, ws := range sm.weaponStats {
+		expectedKills, found := expectedWeapons[ws.WeaponName]
+		if !found {
+			t.Errorf("unexpected weapon stat: %s", ws.WeaponName)
+		} else if ws.Kills != expectedKills {
+			t.Errorf("expected %d kills for %s, got %d", expectedKills, ws.WeaponName, ws.Kills)
+		}
+	}
+}
+
+
 
 

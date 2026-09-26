@@ -121,7 +121,11 @@ func NewStatsModel(
 						if k.Killer == playerPUUID {
 							wName := cache.GetWeaponName(k.FinishingDamage.DamageItem, weaponsMap)
 							if wName == "" || wName == "Weapon" {
-								wName = "Gun"
+								if k.FinishingDamage.DamageItem != "" && !strings.Contains(k.FinishingDamage.DamageItem, "-") {
+									wName = "Ability"
+								} else {
+									wName = "Unknown Weapon"
+								}
 							}
 							ws, ok := weaponMap[wName]
 							if !ok {

@@ -85,3 +85,32 @@ func TestWishlistOperations(t *testing.T) {
 		t.Errorf("expected false after removing from wishlist")
 	}
 }
+
+func TestGetWeaponName(t *testing.T) {
+	// Test Outlaw and Warden default fallbacks
+	if name := GetWeaponName("5f0786ac-4366-2d39-96bd-2586c6734f07", nil); name != "Outlaw" {
+		t.Errorf("expected Outlaw, got %s", name)
+	}
+	if name := GetWeaponName("8db0a1bf-4a50-832a-4566-faaaa6d250ca", nil); name != "Warden" {
+		t.Errorf("expected Warden, got %s", name)
+	}
+
+	// Test uppercase UUID handling
+	if name := GetWeaponName("9C82E19D-4575-0200-1A81-3EACF00CF872", nil); name != "Vandal" {
+		t.Errorf("expected Vandal for uppercase UUID, got %s", name)
+	}
+
+	// Test custom weapons map override
+	customMap := map[string]string{
+		"custom-uuid-1": "Custom Blaster",
+	}
+	if name := GetWeaponName("custom-uuid-1", customMap); name != "Custom Blaster" {
+		t.Errorf("expected Custom Blaster, got %s", name)
+	}
+
+	// Test unknown weapon fallback
+	if name := GetWeaponName("00000000-0000-0000-0000-000000000000", nil); name != "Weapon" {
+		t.Errorf("expected Weapon for unknown UUID, got %s", name)
+	}
+}
+
