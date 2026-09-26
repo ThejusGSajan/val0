@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -60,7 +59,7 @@ func (c *Client) FetchPlayerNames(puuids []string) (map[string]string, error) {
 	}
 
 	url := c.pdURL("/name-service/v2/players")
-	body, err := c.doRequest("PUT", url, bytes.NewReader(payload))
+	body, err := c.doRequest("PUT", url, payload)
 	if err != nil {
 		return nil, fmt.Errorf("fetch player names: %w", err)
 	}

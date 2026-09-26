@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/ThejusGSajan/val0/internal/auth"
 	"github.com/ThejusGSajan/val0/internal/models"
@@ -27,7 +26,7 @@ func (c *Client) FetchStorefront() (*models.StorefrontResponse, error) {
 	var lastErr error
 	for _, shard := range shardsToTry {
 		url := fmt.Sprintf("%s/store/v3/storefront/%s", auth.PDBaseURL(shard), c.session.PUUID)
-		body, err := c.doRequest("POST", url, strings.NewReader("{}"))
+		body, err := c.doRequest("POST", url, []byte("{}"))
 		if err == nil {
 			var sf models.StorefrontResponse
 			if err := json.Unmarshal(body, &sf); err == nil {
