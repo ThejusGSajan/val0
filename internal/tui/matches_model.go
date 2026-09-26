@@ -37,14 +37,15 @@ type MatchItem struct {
 }
 
 type MatchesModel struct {
-	items       []MatchItem
-	cursor      int
-	viewMode    MatchViewMode
-	width       int
-	height      int
-	playerPUUID string
-	agentsMap   map[string]string
-	mapsMap     map[string]string
+	items              []MatchItem
+	cursor             int
+	viewMode           MatchViewMode
+	width              int
+	height             int
+	playerPUUID        string
+	agentsMap          map[string]string
+	mapsMap            map[string]string
+	detailScrollOffset int
 }
 
 func NewMatchesModel(items []MatchItem, playerPUUID string, agents map[string]string, maps map[string]string) MatchesModel {
@@ -67,20 +68,48 @@ func (m MatchesModel) Update(msg tea.Msg) (MatchesModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k", "w":
-			if m.viewMode == MatchViewList && m.cursor > 0 {
-				m.cursor--
+			if m.viewMode == MatchViewList {
+				if m.cursor > 0 {
+					m.cursor--
+				}
+			} else if m.viewMode == MatchViewDetail {
+				if m.detailScrollOffset > 0 {
+					m.detailScrollOffset--
+				}
 			}
 		case "down", "j", "s":
-			if m.viewMode == MatchViewList && m.cursor < len(m.items)-1 {
-				m.cursor++
+			if m.viewMode == MatchViewList {
+				if m.cursor < len(m.items)-1 {
+					m.cursor++
+				}
+			} else if m.viewMode == MatchViewDetail {
+				m.detailScrollOffset++
+			}
+		case "pgup":
+			if m.viewMode == MatchViewDetail {
+				m.detailScrollOffset = max(0, m.detailScrollOffset-8)
+			}
+		case "pgdown":
+			if m.viewMode == MatchViewDetail {
+				m.detailScrollOffset += 8
+			}
+		case "home":
+			if m.viewMode == MatchViewDetail {
+				m.detailScrollOffset = 0
+			}
+		case "end":
+			if m.viewMode == MatchViewDetail {
+				m.detailScrollOffset = 9999
 			}
 		case "enter":
 			if m.viewMode == MatchViewList && len(m.items) > 0 {
 				m.viewMode = MatchViewDetail
+				m.detailScrollOffset = 0
 			}
 		case "esc", "backspace", "left":
 			if m.viewMode == MatchViewDetail {
 				m.viewMode = MatchViewList
+				m.detailScrollOffset = 0
 			}
 		}
 	}
@@ -266,10 +295,11 @@ func (m MatchesModel) renderDetailView() string {
 	sb.WriteString("    " + headerOutcome + "\n")
 	sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
 
+	var bodySb strings.Builder
 	if isDeathmatch {
-		sb.WriteString(m.renderDeathmatchTable(d))
+		bodySb.WriteString(m.renderDeathmatchTable(d))
 	} else if isGauntlet {
-		sb.WriteString(m.renderGauntletScoreboard(d))
+		bodySb.WriteString(m.renderGauntletScoreboard(d))
 	} else {
 		myTeam := d.GetPlayerTeam(m.playerPUUID)
 		myTeamID := "Blue"
@@ -278,8 +308,8 @@ func (m MatchesModel) renderDetailView() string {
 		}
 
 		// Render Friendly Team
-		sb.WriteString(m.renderTeamTable(d, myTeamID, true))
-		sb.WriteString("\n")
+		bodySb.WriteString(m.renderTeamTable(d, myTeamID, true))
+		bodySb.WriteString("\n")
 
 		// Render Opponent Team
 		oppTeam := d.GetOpponentTeam(myTeamID)
@@ -287,16 +317,52 @@ func (m MatchesModel) renderDetailView() string {
 		if oppTeam != nil {
 			oppTeamID = oppTeam.TeamID
 		}
-		sb.WriteString(m.renderTeamTable(d, oppTeamID, false))
-		sb.WriteString("\n")
+		bodySb.WriteString(m.renderTeamTable(d, oppTeamID, false))
+		bodySb.WriteString("\n")
 
 		// Render Round Timeline
 		if !isDeathmatch && !isGauntlet {
-			sb.WriteString(m.renderRoundTimeline(d, myTeamID))
+			bodySb.WriteString(m.renderRoundTimeline(d, myTeamID))
 		}
 	}
 
-	sb.WriteString("\n\n  " + RenderKeyItem("esc", "return to match list"))
+	bodyLines := strings.Split(strings.TrimRight(bodySb.String(), "\n"), "\n")
+	availHeight := m.height - 5 // 3 header lines + 2 footer lines
+	if m.height <= 0 {
+		availHeight = len(bodyLines)
+	} else if availHeight < 4 {
+		availHeight = 4
+	}
+
+	maxScroll := len(bodyLines) - availHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	scrollOffset := m.detailScrollOffset
+	if scrollOffset > maxScroll {
+		scrollOffset = maxScroll
+	}
+	if scrollOffset < 0 {
+		scrollOffset = 0
+	}
+	endLine := scrollOffset + availHeight
+	if endLine > len(bodyLines) {
+		endLine = len(bodyLines)
+	}
+
+	for _, line := range bodyLines[scrollOffset:endLine] {
+		sb.WriteString(line + "\n")
+	}
+
+	if len(bodyLines) > availHeight {
+		indicator := fmt.Sprintf("[%d-%d/%d]", scrollOffset+1, endLine, len(bodyLines))
+		sb.WriteString("\n  " + RenderKeyLegends(
+			[2]string{"esc", "back"},
+			[2]string{"↑/↓", "scroll"},
+		) + "  " + lipgloss.NewStyle().Foreground(ColorMuted).Render(indicator))
+	} else {
+		sb.WriteString("\n\n  " + RenderKeyItem("esc", "return to match list"))
+	}
 
 	return sb.String()
 }
@@ -445,33 +511,44 @@ func (m MatchesModel) renderGauntletScoreboard(d *models.MatchDetails) string {
 
 	for _, entry := range leaderboard {
 		ordinal := models.FormatOrdinal(entry.Rank)
-		teamLabel := fmt.Sprintf("  %s — %s TEAM", ordinal, strings.ToUpper(entry.Team.TeamID))
-		if entry.IsMyTeam {
-			teamLabel += " (YOUR TEAM)"
-		}
+		teamBase := fmt.Sprintf("  %s — %s TEAM", ordinal, strings.ToUpper(entry.Team.TeamID))
 
-		teamColor := lipgloss.Color("#EF4444") // Red for opponent teams
-		if entry.Rank == 1 {
-			teamColor = lipgloss.Color("#F59E0B") // Gold for 1st place
+		// Team Header Styling:
+		// 1. Winning team (Rank 1) in Green (ColorWin #22C55E).
+		// 2. User's team in Amber (#F59E0B).
+		// 3. If user's team won 1st place: dual-color (Team name green, (YOUR TEAM) badge amber).
+		// 4. Opponent teams in Red (ColorLoss #EF4444).
+		var teamHeader string
+		if entry.Rank == 1 && entry.IsMyTeam {
+			teamHeader = lipgloss.NewStyle().Foreground(ColorWin).Bold(true).Render(teamBase) +
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Bold(true).Render(" (YOUR TEAM)")
+		} else if entry.Rank == 1 {
+			teamHeader = lipgloss.NewStyle().Foreground(ColorWin).Bold(true).Render(teamBase)
 		} else if entry.IsMyTeam {
-			teamColor = lipgloss.Color("#5A9FE2") // Blue for user's team
+			teamHeader = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Bold(true).Render(teamBase + " (YOUR TEAM)")
+		} else {
+			teamHeader = lipgloss.NewStyle().Foreground(ColorLoss).Bold(true).Render(teamBase)
 		}
 
-		header := lipgloss.NewStyle().Foreground(teamColor).Bold(true).Render(teamLabel) +
-			lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf(" — %d rounds", entry.Team.RoundsWon))
-		sb.WriteString(header + "\n")
+		roundWord := "rounds won"
+		if entry.Team.RoundsWon == 1 {
+			roundWord = "round won"
+		}
+		roundsStr := fmt.Sprintf(" — %d %s", entry.Team.RoundsWon, roundWord)
+		teamHeader += lipgloss.NewStyle().Foreground(ColorMuted).Render(roundsStr)
+		sb.WriteString(teamHeader + "\n")
 
-		headerRow := fmt.Sprintf("  %-18s  %-9s  %3s  %3s %3s %3s   %4s   %4s   %4s",
-			"Player", "Agent", "ACS", "K", "D", "A", "HS%", "ADR", "Econ")
+		// Columns: Agent and Econ removed. Player column expanded to 22 characters.
+		headerRow := fmt.Sprintf("  %-22s  %3s  %3s %3s %3s   %4s   %4s",
+			"Player", "ACS", "K", "D", "A", "HS%", "ADR")
 		sb.WriteString(lipgloss.NewStyle().Foreground(ColorMuted).Render(headerRow) + "\n")
-		sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 70)) + "\n")
+		sb.WriteString("  " + strings.Repeat("─", max(m.width-4, 56)) + "\n")
 
 		type playerRow struct {
 			player models.MatchPlayer
 			acs    int
 			adr    int
 			hsPct  int
-			econ   int
 			name   string
 		}
 
@@ -490,13 +567,12 @@ func (m MatchesModel) renderGauntletScoreboard(d *models.MatchDetails) string {
 				name = "<Hidden>"
 			}
 
-			acs, adr, hsPct, econ := d.ComputePlayerAdvancedStats(p.Subject)
+			acs, adr, hsPct, _ := d.ComputePlayerAdvancedStats(p.Subject)
 			rows = append(rows, playerRow{
 				player: p,
 				acs:    acs,
 				adr:    adr,
 				hsPct:  hsPct,
-				econ:   econ,
 				name:   name,
 			})
 		}
@@ -509,23 +585,20 @@ func (m MatchesModel) renderGauntletScoreboard(d *models.MatchDetails) string {
 		})
 
 		for _, r := range rows {
-			agentName := ResolveAgentDisplayName(r.player.CharacterID, m.agentsMap, d)
-			pName := truncate(r.name, 18)
+			pName := truncate(r.name, 22)
 			nameColor := ColorFg
 			if r.player.Subject == m.playerPUUID {
-				nameColor = ColorSelect
+				nameColor = lipgloss.Color("#F59E0B") // User player row styled in Amber
 			}
 
-			sb.WriteString(fmt.Sprintf("  %-18s  %-9s  %3d  %3d %3d %3d   %3d%%   %4d   %4d\n",
-				lipgloss.NewStyle().Foreground(nameColor).Render(fmt.Sprintf("%-18s", pName)),
-				lipgloss.NewStyle().Foreground(ColorMuted).Render(fmt.Sprintf("%-9s", agentName)),
+			sb.WriteString(fmt.Sprintf("  %-22s  %3d  %3d %3d %3d   %3d%%   %4d\n",
+				lipgloss.NewStyle().Foreground(nameColor).Render(fmt.Sprintf("%-22s", pName)),
 				r.acs,
 				r.player.Stats.Kills,
 				r.player.Stats.Deaths,
 				r.player.Stats.Assists,
 				r.hsPct,
 				r.adr,
-				r.econ,
 			))
 		}
 		sb.WriteString("\n")

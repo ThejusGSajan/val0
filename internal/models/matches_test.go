@@ -538,3 +538,41 @@ func TestGauntletLeaderboardAndRank(t *testing.T) {
 	}
 }
 
+func TestGauntletLeaderboard_RoundResultsAggregation(t *testing.T) {
+	teams := []MatchTeam{
+		{TeamID: "Team_1", Won: false, RoundsWon: 0},
+		{TeamID: "Team_2", Won: true, RoundsWon: 0},
+	}
+	players := []MatchPlayer{
+		{Subject: "p1", TeamID: "Team_1", Stats: PlayerStats{Kills: 4, RoundsPlayed: 5}},
+		{Subject: "p2", TeamID: "Team_2", Stats: PlayerStats{Kills: 8, RoundsPlayed: 5}},
+	}
+	roundResults := []RoundResult{
+		{RoundNum: 1, WinningTeam: "Team_2"},
+		{RoundNum: 2, WinningTeam: "Team_1"},
+		{RoundNum: 3, WinningTeam: "Team_2"},
+		{RoundNum: 4, WinningTeam: "Team_2"},
+		{RoundNum: 5, WinningTeam: "Team_1"},
+	}
+	md := &MatchDetails{
+		MatchInfo:    MatchInfo{QueueID: "abilitydraftarena"},
+		Teams:        teams,
+		Players:      players,
+		RoundResults: roundResults,
+	}
+
+	leaderboard := md.GetGauntletLeaderboard("p1")
+	if len(leaderboard) != 2 {
+		t.Fatalf("expected 2 teams, got %d", len(leaderboard))
+	}
+	// Team 2 won 3 rounds
+	if leaderboard[0].Team.TeamID != "Team_2" || leaderboard[0].Team.RoundsWon != 3 {
+		t.Errorf("expected Team_2 with 3 rounds won, got %s with %d", leaderboard[0].Team.TeamID, leaderboard[0].Team.RoundsWon)
+	}
+	// Team 1 won 2 rounds
+	if leaderboard[1].Team.TeamID != "Team_1" || leaderboard[1].Team.RoundsWon != 2 {
+		t.Errorf("expected Team_1 with 2 rounds won, got %s with %d", leaderboard[1].Team.TeamID, leaderboard[1].Team.RoundsWon)
+	}
+}
+
+

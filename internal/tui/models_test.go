@@ -2038,7 +2038,7 @@ func TestMatchesModel_GauntletDetailView(t *testing.T) {
 	}
 
 	m := NewMatchesModel([]MatchItem{item}, "player-6-a", nil, nil)
-	m.SetSize(120, 40)
+	m.SetSize(120, 60)
 
 	// Enter detail view
 	detailModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -2060,18 +2060,110 @@ func TestMatchesModel_GauntletDetailView(t *testing.T) {
 		}
 	}
 
-	// Verify agent shows '-' and never 'Agent' in player rows
-	if !strings.Contains(view, " - ") {
-		t.Errorf("detail scoreboard should display '-' for agent, got:\n%s", view)
+	// Verify Agent and Econ are NOT in the table
+	if strings.Contains(view, "Agent") {
+		t.Errorf("detail scoreboard should NOT display 'Agent', got:\n%s", view)
 	}
-	for _, line := range strings.Split(view, "\n") {
-		// Skip table header row
-		if strings.Contains(line, "Player") && strings.Contains(line, "Agent") && strings.Contains(line, "ACS") {
-			continue
-		}
-		if strings.Contains(line, " Agent ") {
-			t.Errorf("detail scoreboard row should NOT display 'Agent', got:\n%s", line)
-		}
+	if strings.Contains(view, "Econ") {
+		t.Errorf("detail scoreboard should NOT display 'Econ', got:\n%s", view)
+	}
+
+	// Verify table header contains streamlined columns
+	if !strings.Contains(view, "Player") || !strings.Contains(view, "ACS") || !strings.Contains(view, "HS%") || !strings.Contains(view, "ADR") {
+		t.Errorf("detail scoreboard missing streamlined columns, got:\n%s", view)
+	}
+
+	// Verify rounds won formatting
+	if !strings.Contains(view, "8 rounds won") {
+		t.Errorf("expected '8 rounds won' in winning team header, got:\n%s", view)
+	}
+}
+
+func TestMatchesModel_DetailViewScrolling(t *testing.T) {
+	teams := make([]models.MatchTeam, 8)
+	players := make([]models.MatchPlayer, 16)
+	for i := 0; i < 8; i++ {
+		tID := fmt.Sprintf("Team_%d", i+1)
+		teams[i] = models.MatchTeam{TeamID: tID, Won: i == 0, RoundsWon: 8 - i}
+		players[i*2] = models.MatchPlayer{Subject: fmt.Sprintf("p%d-a", i+1), TeamID: tID, GameName: fmt.Sprintf("Player%d", i+1)}
+		players[i*2+1] = models.MatchPlayer{Subject: fmt.Sprintf("p%d-b", i+1), TeamID: tID, GameName: fmt.Sprintf("Partner%d", i+1)}
+	}
+
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{MatchID: "gauntlet-scroll", QueueID: "abilitydraftarena"},
+		Teams:     teams,
+		Players:   players,
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-scroll",
+		MapName:     "Gauntlet",
+		QueueName:   "Gauntlet",
+		Details:     details,
+		PlayerPUUID: "p1-a",
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "p1-a", nil, nil)
+	// Small terminal height to force scrolling
+	m.SetSize(120, 20)
+
+	// Enter detail view
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected initial detailScrollOffset=0, got %d", m.detailScrollOffset)
+	}
+
+	view0 := m.View()
+	if !strings.Contains(view0, "[1-15/") {
+		t.Errorf("expected scroll indicator [1-15/...], got:\n%s", view0)
+	}
+	if !strings.Contains(view0, "TEAM_1 TEAM (YOUR TEAM)") {
+		t.Errorf("expected top team in initial scroll view, got:\n%s", view0)
+	}
+
+	// Scroll down with j
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if m.detailScrollOffset != 1 {
+		t.Errorf("expected detailScrollOffset=1 after 'j', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll down with down arrow
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.detailScrollOffset != 2 {
+		t.Errorf("expected detailScrollOffset=2 after 'down', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll pgdown (+8)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m.detailScrollOffset != 10 {
+		t.Errorf("expected detailScrollOffset=10 after 'pgdown', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll end
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	if m.detailScrollOffset == 0 {
+		t.Errorf("expected clamped max scroll offset on 'end', got 0")
+	}
+
+	// Scroll home
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset=0 on 'home', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll up with k
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset clamped at 0 on 'k', got %d", m.detailScrollOffset)
+	}
+
+	// Return to list with esc
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.viewMode != MatchViewList {
+		t.Errorf("expected viewMode=MatchViewList on 'esc', got %v", m.viewMode)
+	}
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset reset to 0 on 'esc', got %d", m.detailScrollOffset)
 	}
 }
 

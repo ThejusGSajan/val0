@@ -211,6 +211,14 @@ func (m *MatchDetails) GetGauntletLeaderboard(myPUUID string) []GauntletTeamEntr
 		}
 	}
 
+	// Riot API sends t.RoundsWon = 0 in Gauntlet payloads; aggregate actual round wins from RoundResults.
+	roundWins := make(map[string]int)
+	for _, rr := range m.RoundResults {
+		if rr.WinningTeam != "" {
+			roundWins[strings.ToUpper(rr.WinningTeam)]++
+		}
+	}
+
 	for _, p := range m.Players {
 		tID := strings.ToUpper(p.TeamID)
 		entry, ok := teamMap[tID]
@@ -228,6 +236,26 @@ func (m *MatchDetails) GetGauntletLeaderboard(myPUUID string) []GauntletTeamEntr
 		entry.TotalAssists += p.Stats.Assists
 		if p.Subject == myPUUID && myPUUID != "" {
 			entry.IsMyTeam = true
+		}
+	}
+
+	// Apply aggregated round wins and derive RoundsPlayed if unpopulated
+	for tIDUpper, entry := range teamMap {
+		if wins, ok := roundWins[tIDUpper]; ok && wins > 0 {
+			entry.Team.RoundsWon = wins
+		}
+		if entry.Team.RoundsPlayed <= 0 {
+			maxPlayed := 0
+			for _, p := range entry.Players {
+				if p.Stats.RoundsPlayed > maxPlayed {
+					maxPlayed = p.Stats.RoundsPlayed
+				}
+			}
+			if maxPlayed > 0 {
+				entry.Team.RoundsPlayed = maxPlayed
+			} else if entry.Team.RoundsWon > 0 {
+				entry.Team.RoundsPlayed = entry.Team.RoundsWon
+			}
 		}
 	}
 
