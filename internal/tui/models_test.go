@@ -2073,9 +2073,9 @@ func TestMatchesModel_GauntletDetailView(t *testing.T) {
 		t.Errorf("detail scoreboard missing streamlined columns, got:\n%s", view)
 	}
 
-	// Verify rounds won formatting
-	if !strings.Contains(view, "8 rounds won") {
-		t.Errorf("expected '8 rounds won' in winning team header, got:\n%s", view)
+	// Verify rounds won suffix is completely omitted
+	if strings.Contains(view, "rounds won") || strings.Contains(view, "round won") {
+		t.Errorf("expected rounds won suffix to be omitted from Gauntlet header, got:\n%s", view)
 	}
 }
 

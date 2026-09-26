@@ -530,12 +530,6 @@ func (m MatchesModel) renderGauntletScoreboard(d *models.MatchDetails) string {
 			teamHeader = lipgloss.NewStyle().Foreground(ColorLoss).Bold(true).Render(teamBase)
 		}
 
-		roundWord := "rounds won"
-		if entry.Team.RoundsWon == 1 {
-			roundWord = "round won"
-		}
-		roundsStr := fmt.Sprintf(" — %d %s", entry.Team.RoundsWon, roundWord)
-		teamHeader += lipgloss.NewStyle().Foreground(ColorMuted).Render(roundsStr)
 		sb.WriteString(teamHeader + "\n")
 
 		// Columns: Agent and Econ removed. Player column expanded to 22 characters.
