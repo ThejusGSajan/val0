@@ -974,28 +974,64 @@ func (m MainModel) loadData() tea.Msg {
 
 	if matchHist != nil && len(matchHist.History) > 0 {
 		limit := min(len(matchHist.History), 20)
-		detailChan := make(chan *models.MatchDetails, limit)
-		var detailWg sync.WaitGroup
+		detailsMap := make(map[string]*models.MatchDetails)
+		var uncachedIDs []string
 
+		// 1. Check disk / in-memory cache first (instant hit, 0 network requests)
 		for i := 0; i < limit; i++ {
-			matchSummary := matchHist.History[i]
-			detailWg.Add(1)
-			go func(mID string) {
-				defer detailWg.Done()
-				d, dErr := client.FetchMatchDetails(mID)
-				if dErr == nil && d != nil {
-					detailChan <- d
-				}
-			}(matchSummary.MatchID)
+			mID := matchHist.History[i].MatchID
+			if cached, ok := cache.GetCachedMatchDetails(mID); ok && cached != nil {
+				detailsMap[mID] = cached
+				matchDetails = append(matchDetails, cached)
+			} else {
+				uncachedIDs = append(uncachedIDs, mID)
+			}
 		}
 
-		detailWg.Wait()
-		close(detailChan)
+		// 2. Fetch uncached matches via bounded worker pool (max 3 workers, 50ms pacing)
+		if len(uncachedIDs) > 0 {
+			type fetchResult struct {
+				matchID string
+				details *models.MatchDetails
+			}
+			resultChan := make(chan fetchResult, len(uncachedIDs))
+			jobs := make(chan string, len(uncachedIDs))
 
-		detailsMap := make(map[string]*models.MatchDetails)
-		for d := range detailChan {
-			detailsMap[d.MatchInfo.MatchID] = d
-			matchDetails = append(matchDetails, d)
+			const maxWorkers = 3
+			numWorkers := min(maxWorkers, len(uncachedIDs))
+			var workerWg sync.WaitGroup
+
+			for w := 0; w < numWorkers; w++ {
+				workerWg.Add(1)
+				go func() {
+					defer workerWg.Done()
+					for mID := range jobs {
+						d, dErr := client.FetchMatchDetails(mID)
+						if dErr == nil && d != nil {
+							_ = cache.SaveCachedMatchDetails(d)
+							resultChan <- fetchResult{matchID: mID, details: d}
+						} else {
+							resultChan <- fetchResult{matchID: mID, details: nil}
+						}
+						time.Sleep(50 * time.Millisecond) // Throttling pacing
+					}
+				}()
+			}
+
+			for _, id := range uncachedIDs {
+				jobs <- id
+			}
+			close(jobs)
+
+			workerWg.Wait()
+			close(resultChan)
+
+			for res := range resultChan {
+				if res.details != nil {
+					detailsMap[res.matchID] = res.details
+					matchDetails = append(matchDetails, res.details)
+				}
+			}
 		}
 
 		// Collect all unique PUUIDs from all match details
@@ -1043,11 +1079,13 @@ func (m MainModel) loadData() tea.Msg {
 		// Assemble MatchItems preserving history order
 		for _, ms := range matchHist.History {
 			d, hasDetail := detailsMap[ms.MatchID]
+			queueName := ResolveQueueDisplayName(ms.QueueID, "")
 			item := MatchItem{
 				MatchID:     ms.MatchID,
-				QueueName:   "Unrated",
-				Outcome:     "DRAW",
-				Score:       "0-0",
+				QueueName:   queueName,
+				Outcome:     "—",
+				Score:       "—",
+				MapName:     "Match Details Pending",
 				GameTime:    time.UnixMilli(ms.GameStartTime),
 				PlayerPUUID: m.session.PUUID,
 			}
@@ -1070,8 +1108,6 @@ func (m MainModel) loadData() tea.Msg {
 					item.Deaths = p.Stats.Deaths
 					item.Assists = p.Stats.Assists
 				}
-			} else {
-				item.MapName = "Valorant Match"
 			}
 
 			matchItems = append(matchItems, item)
@@ -1111,26 +1147,55 @@ func (m MainModel) silentBackgroundPoll() tea.Msg {
 	}
 
 	limit := min(len(matchHist.History), 20)
-	detailChan := make(chan *models.MatchDetails, limit)
-	var wg sync.WaitGroup
+	var details []*models.MatchDetails
+	var uncachedIDs []string
 
 	for i := 0; i < limit; i++ {
-		wg.Add(1)
-		go func(mID string) {
-			defer wg.Done()
-			d, dErr := client.FetchMatchDetails(mID)
-			if dErr == nil && d != nil {
-				detailChan <- d
-			}
-		}(matchHist.History[i].MatchID)
+		mID := matchHist.History[i].MatchID
+		if cached, ok := cache.GetCachedMatchDetails(mID); ok && cached != nil {
+			details = append(details, cached)
+		} else {
+			uncachedIDs = append(uncachedIDs, mID)
+		}
 	}
 
-	wg.Wait()
-	close(detailChan)
+	if len(uncachedIDs) > 0 {
+		type fetchResult struct {
+			details *models.MatchDetails
+		}
+		resultChan := make(chan fetchResult, len(uncachedIDs))
+		jobs := make(chan string, len(uncachedIDs))
+		const maxWorkers = 3
+		numWorkers := min(maxWorkers, len(uncachedIDs))
+		var workerWg sync.WaitGroup
 
-	var details []*models.MatchDetails
-	for d := range detailChan {
-		details = append(details, d)
+		for w := 0; w < numWorkers; w++ {
+			workerWg.Add(1)
+			go func() {
+				defer workerWg.Done()
+				for mID := range jobs {
+					d, dErr := client.FetchMatchDetails(mID)
+					if dErr == nil && d != nil {
+						_ = cache.SaveCachedMatchDetails(d)
+						resultChan <- fetchResult{details: d}
+					}
+					time.Sleep(50 * time.Millisecond)
+				}
+			}()
+		}
+
+		for _, id := range uncachedIDs {
+			jobs <- id
+		}
+		close(jobs)
+		workerWg.Wait()
+		close(resultChan)
+
+		for res := range resultChan {
+			if res.details != nil {
+				details = append(details, res.details)
+			}
+		}
 	}
 
 	compUpdates, _ := client.FetchCompetitiveUpdates(0, 20)
