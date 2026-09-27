@@ -24,20 +24,69 @@
 - **Night Market Integration (`[n] Night Market`)**: Dynamically unlocks when the Night Market event is active, presenting all 6 discounted offers, custom calculated discount percentages, and original vs. discounted VP pricing.
 - **Terminal Graphic Previews**: High-performance skin sprite rendering using Sixel graphics (supported natively in Windows Terminal v1.22+ and modern terminal emulators) or high-density Unicode half-block ANSI fallbacks.
 
+#### Daily Store (`[s] Shop`)
+<p align="center">
+  <a href="resources/screens/val0_store_shop.png">
+    <img src="resources/screens/val0_store_shop.png" alt="Daily Rotating Storefront" width="100%">
+  </a>
+</p>
+
+#### Skin Wishlist & Catalog Search (`[w] Wishlist`)
+<p align="center">
+  <a href="resources/screens/val0_store_wishlist.png">
+    <img src="resources/screens/val0_store_wishlist.png" alt="Skin Wishlist and Search" width="100%">
+  </a>
+</p>
+
+#### Night Market (`[n] Night Market`)
+<p align="center">
+  <a href="resources/screens/val0_store_nightmarket.png">
+    <img src="resources/screens/val0_store_nightmarket.png" alt="Night Market" width="100%">
+  </a>
+</p>
+
 ### 2. Match History & Scoreboard (`[2] Matches`)
 - **Recent Matches Overview**: Chronological list of your last 20 matches across all game modes.
 - **Match Summary Badges**: Immediate visual indicators for outcome (`WIN`, `LOSS`, `DRAW`), map name, queue type, agent played, final round score, K/D/A ratio, Ranked Rating delta (`+/- RR` for competitive games), and relative match age.
 - **Detailed Match Scoreboard (`Enter`)**: Drill into any match to view the complete 10-player scoreboard split into friendly and enemy teams (or unified leaderboard for Deathmatch).
 - **In-Depth Performance Breakdown**: Tracks ACS, Kills, Deaths, Assists, Headshot %, Average Damage per Round (ADR), Econ rating, and a round-by-round win/loss timeline (`■`/`□`).
 
+#### Match History
+<p align="center">
+  <a href="resources/screens/val0_matches.png">
+    <img src="resources/screens/val0_matches.png" alt="Match History" width="100%">
+  </a>
+</p>
+
+#### Detailed Match Stats (`Enter`)
+<p align="center">
+  <a href="resources/screens/val0_matches_detailed.png">
+    <img src="resources/screens/val0_matches_detailed.png" alt="Detailed Match Scoreboard" width="100%">
+  </a>
+</p>
+
 ### 3. Performance Analytics & Weapon Mastery (`[3] Stats`)
 - **Agent Performance Metrics**: Aggregated performance statistics across all played agents in tactical modes (automatically filters out Deathmatch and other casual arcade modes for accurate combat averages). Tracks games played, win rate %, K/D ratio, ACS, ADR, and Headshot %.
 - **Weapon Mastery Statistics**: Detailed kill breakdown for your top 6 weapons ranked by total eliminations across recent matches.
 - **Ranked Rating Trend Sparkline**: Chronological signed sparkline (`▲`/`▼`/`─`) tracking competitive rating fluctuations across recent matches, accompanied by your current competitive rank badge and aggregate Net RR earned.
 
+#### Stats
+<p align="center">
+  <a href="resources/screens/val0_stats.png">
+    <img src="resources/screens/val0_stats.png" alt="Stats" width="100%">
+  </a>
+</p>
+
 ### 4. Battlepass & Active Missions (`[4] Progress`)
 - **Act Battlepass Tracker**: Visual tier progress bar displaying current tier, total tiers, overall act progression percentage, current tier XP progress (`XPInCurrentTier` / `XPForNextTier`), and total accumulated XP.
 - **Active Missions Breakdown**: Real-time status for all active daily and weekly mission contracts, displaying target objective progress bars, completion checkmarks, and XP reward values.
+
+#### Battlepass & Active Missions
+<p align="center">
+  <a href="resources/screens/val0_progress.png">
+    <img src="resources/screens/val0_progress.png" alt="Battlepass and Mission Contracts" width="100%">
+  </a>
+</p>
 
 ### 5. Intelligent Session Tracker (`[5] Session`)
 - **Hybrid Session Resumption**: Automatically resumes your session if your last match occurred within the past 2 hours; otherwise anchors to midnight today for a fresh daily view.
@@ -46,6 +95,13 @@
 - **Session Match Breakdown Table**: Scrollable table detailing every match played during the session with agent icons, scores, combat stats, and individual RR deltas.
 - **Manual Session Reset (`x`)**: Clear the active session and start a new tracking baseline at any point.
 - **Silent Background Auto-Polling**: Every 30 seconds, `val0` silently checks for completed matches while on Tab 2 or Tab 5, updating stats seamlessly without UI freezes or loading flickers.
+
+#### Session Tracker
+<p align="center">
+  <a href="resources/screens/val0_session.png">
+    <img src="resources/screens/val0_session.png" alt="Intelligent Session Tracker" width="100%">
+  </a>
+</p>
 
 ---
 
