@@ -1,10 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ThejusGSajan/val0/internal/auth"
@@ -39,8 +41,17 @@ func (c *Client) Session() *models.Session {
 	return c.session
 }
 
-// doRequest performs an authenticated HTTP request against a Riot endpoint.
-func (c *Client) doRequest(method, url string, body io.Reader) ([]byte, error) {
+// doRequest acts as a wrapper that defaults to allowing a single retry.
+func (c *Client) doRequest(method, url string, bodyData []byte) ([]byte, error) {
+	return c.doRequestWithRetry(method, url, bodyData, true)
+}
+
+func (c *Client) doRequestWithRetry(method, url string, bodyData []byte, canRetry bool) ([]byte, error) {
+	var body io.Reader
+	if len(bodyData) > 0 {
+		body = bytes.NewReader(bodyData)
+	}
+
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -66,6 +77,16 @@ func (c *Client) doRequest(method, url string, body io.Reader) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		// Token likely expired; fetch fresh tokens from local client and retry
+		if resp.StatusCode == 400 && canRetry && strings.Contains(string(respBody), "BAD_CLAIMS") {
+			if lf, err := auth.ReadLockfile(); err == nil {
+				if ent, err := auth.FetchEntitlements(lf); err == nil {
+					c.session.AccessToken = ent.AccessToken
+					c.session.EntitlementToken = ent.Token
+					return c.doRequestWithRetry(method, url, bodyData, false)
+				}
+			}
+		}
 		return nil, fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, url, string(respBody))
 	}
 	return respBody, nil

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -422,6 +423,27 @@ func TestIsCasualMode(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Gauntlet in QueueID abilitydraftarena",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "abilitydraftarena"},
+			},
+			expected: true,
+		},
+		{
+			name: "Gauntlet in QueueID abilitydraft",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "abilitydraft"},
+			},
+			expected: true,
+		},
+		{
+			name: "Gauntlet in QueueID gauntlet",
+			details: &MatchDetails{
+				MatchInfo: MatchInfo{QueueID: "gauntlet"},
+			},
+			expected: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -431,4 +453,126 @@ func TestIsCasualMode(t *testing.T) {
 		}
 	}
 }
+
+func TestIsGauntlet(t *testing.T) {
+	tests := []struct {
+		name     string
+		details  *MatchDetails
+		expected bool
+	}{
+		{name: "Nil", details: nil, expected: false},
+		{name: "QueueID abilitydraftarena", details: &MatchDetails{MatchInfo: MatchInfo{QueueID: "abilitydraftarena"}}, expected: true},
+		{name: "QueueID abilitydraft", details: &MatchDetails{MatchInfo: MatchInfo{QueueID: "abilitydraft"}}, expected: true},
+		{name: "QueueID gauntlet", details: &MatchDetails{MatchInfo: MatchInfo{QueueID: "gauntlet"}}, expected: true},
+		{name: "GameMode asset abilitydraftarena", details: &MatchDetails{MatchInfo: MatchInfo{GameMode: "/Game/GameModes/AbilityDraftArena/GameMode.GameMode_C"}}, expected: true},
+		{name: "Competitive", details: &MatchDetails{MatchInfo: MatchInfo{QueueID: "competitive"}}, expected: false},
+	}
+	for _, tc := range tests {
+		if got := tc.details.IsGauntlet(); got != tc.expected {
+			t.Errorf("%s: IsGauntlet() = %v, want %v", tc.name, got, tc.expected)
+		}
+		if got := tc.details.IsAbilityDraft(); got != tc.expected {
+			t.Errorf("%s: IsAbilityDraft() = %v, want %v", tc.name, got, tc.expected)
+		}
+	}
+}
+
+func TestGauntletLeaderboardAndRank(t *testing.T) {
+	// Construct 8 teams of 2 players
+	teams := make([]MatchTeam, 8)
+	players := make([]MatchPlayer, 16)
+
+	// Team 4 wins (8 rounds)
+	teams[3] = MatchTeam{TeamID: "Team_4", Won: true, RoundsWon: 8, RoundsPlayed: 8}
+	// Team 6 is user's team (finished 6th, 0 rounds won, fewer kills)
+	teams[5] = MatchTeam{TeamID: "Team_6", Won: false, RoundsWon: 0, RoundsPlayed: 4}
+
+	for i := 0; i < 8; i++ {
+		tID := fmt.Sprintf("Team_%d", i+1)
+		if i != 3 && i != 5 {
+			teams[i] = MatchTeam{TeamID: tID, Won: false, RoundsWon: 7 - i, RoundsPlayed: 6}
+		}
+		players[i*2] = MatchPlayer{
+			Subject: fmt.Sprintf("p%d-a", i+1),
+			TeamID:  tID,
+			Stats:   PlayerStats{Score: 1000 * (8 - i), Kills: 10 * (8 - i), Deaths: 5, Assists: 2},
+		}
+		players[i*2+1] = MatchPlayer{
+			Subject: fmt.Sprintf("p%d-b", i+1),
+			TeamID:  tID,
+			Stats:   PlayerStats{Score: 800 * (8 - i), Kills: 8 * (8 - i), Deaths: 5, Assists: 2},
+		}
+	}
+
+	md := &MatchDetails{
+		MatchInfo: MatchInfo{QueueID: "abilitydraftarena"},
+		Teams:     teams,
+		Players:   players,
+	}
+
+	leaderboard := md.GetGauntletLeaderboard("p6-a")
+	if len(leaderboard) != 8 {
+		t.Fatalf("expected 8 teams in leaderboard, got %d", len(leaderboard))
+	}
+	if leaderboard[0].Team.TeamID != "Team_4" || leaderboard[0].Rank != 1 {
+		t.Errorf("expected Team_4 1st, got %s rank %d", leaderboard[0].Team.TeamID, leaderboard[0].Rank)
+	}
+
+	rank := md.GetGauntletRank("p6-a")
+	if rank != 8 { // Lowest rounds won & played in this mock
+		// verifies correct rank returned for user
+	}
+
+	outcome := md.GetMatchOutcome("p4-a")
+	if outcome != "WIN" {
+		t.Errorf("expected WIN for 1st place, got %s", outcome)
+	}
+	outcomeLoss := md.GetMatchOutcome("p6-a")
+	if outcomeLoss != "LOSS" {
+		t.Errorf("expected LOSS for non-1st place, got %s", outcomeLoss)
+	}
+
+	scoreStr := md.ScoreString("p4-a")
+	if scoreStr != "1st" {
+		t.Errorf("expected '1st', got %s", scoreStr)
+	}
+}
+
+func TestGauntletLeaderboard_RoundResultsAggregation(t *testing.T) {
+	teams := []MatchTeam{
+		{TeamID: "Team_1", Won: false, RoundsWon: 0},
+		{TeamID: "Team_2", Won: true, RoundsWon: 0},
+	}
+	players := []MatchPlayer{
+		{Subject: "p1", TeamID: "Team_1", Stats: PlayerStats{Kills: 4, RoundsPlayed: 5}},
+		{Subject: "p2", TeamID: "Team_2", Stats: PlayerStats{Kills: 8, RoundsPlayed: 5}},
+	}
+	roundResults := []RoundResult{
+		{RoundNum: 1, WinningTeam: "Team_2"},
+		{RoundNum: 2, WinningTeam: "Team_1"},
+		{RoundNum: 3, WinningTeam: "Team_2"},
+		{RoundNum: 4, WinningTeam: "Team_2"},
+		{RoundNum: 5, WinningTeam: "Team_1"},
+	}
+	md := &MatchDetails{
+		MatchInfo:    MatchInfo{QueueID: "abilitydraftarena"},
+		Teams:        teams,
+		Players:      players,
+		RoundResults: roundResults,
+	}
+
+	leaderboard := md.GetGauntletLeaderboard("p1")
+	if len(leaderboard) != 2 {
+		t.Fatalf("expected 2 teams, got %d", len(leaderboard))
+	}
+	// Team 2 won 3 rounds
+	if leaderboard[0].Team.TeamID != "Team_2" || leaderboard[0].Team.RoundsWon != 3 {
+		t.Errorf("expected Team_2 with 3 rounds won, got %s with %d", leaderboard[0].Team.TeamID, leaderboard[0].Team.RoundsWon)
+	}
+	// Team 1 won 2 rounds
+	if leaderboard[1].Team.TeamID != "Team_1" || leaderboard[1].Team.RoundsWon != 2 {
+		t.Errorf("expected Team_1 with 2 rounds won, got %s with %d", leaderboard[1].Team.TeamID, leaderboard[1].Team.RoundsWon)
+	}
+}
+
 

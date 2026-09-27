@@ -54,12 +54,12 @@ func isExcludedStatsMatch(md *models.MatchDetails) bool {
 	if md == nil {
 		return true
 	}
-	if md.IsCasualMode() || md.IsDeathmatch() {
+	if md.IsCasualMode() || md.IsDeathmatch() || md.IsGauntlet() {
 		return true
 	}
 	resolved := ResolveQueueDisplayName(md.MatchInfo.QueueID, md.MatchInfo.GameMode)
 	switch resolved {
-	case "Deathmatch", "Team Deathmatch", "Escalation", "Skirmish", "Snowball Fight":
+	case "Deathmatch", "Team Deathmatch", "Escalation", "Skirmish", "Snowball Fight", "Gauntlet":
 		return true
 	}
 	return false
@@ -121,7 +121,11 @@ func NewStatsModel(
 						if k.Killer == playerPUUID {
 							wName := cache.GetWeaponName(k.FinishingDamage.DamageItem, weaponsMap)
 							if wName == "" || wName == "Weapon" {
-								wName = "Gun"
+								if k.FinishingDamage.DamageItem != "" && !strings.Contains(k.FinishingDamage.DamageItem, "-") {
+									wName = "Ability"
+								} else {
+									wName = "Unknown Weapon"
+								}
 							}
 							ws, ok := weaponMap[wName]
 							if !ok {

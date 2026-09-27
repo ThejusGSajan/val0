@@ -70,8 +70,8 @@ func TryRelaunchInWT(args []string) bool {
 	}
 
 	// Construct command to launch inside Windows Terminal
-	// wt.exe --title "Val-Tracker" <exePath> <args...>
-	wtArgs := append([]string{"--title", "Val-Tracker", exePath}, args...)
+	// wt.exe --title "val0" <exePath> <args...>
+	wtArgs := append([]string{"--title", "val0", exePath}, args...)
 	cmd := exec.Command(wtPath, wtArgs...)
 	cmd.Env = append(os.Environ(), "VAL0_RELAUNCHED=1")
 

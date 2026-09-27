@@ -2,24 +2,30 @@ package tui
 
 import (
 	"strings"
+
+	"github.com/ThejusGSajan/val0/internal/cache"
+	"github.com/ThejusGSajan/val0/internal/models"
 )
 
 // QueueDisplayName translates internal Valorant QueueID strings
 // into human-readable game mode names.
 var queueDisplayNames = map[string]string{
-	"competitive": "Competitive",
-	"unrated":     "Unrated",
-	"deathmatch":  "Deathmatch",
-	"skirmish":    "Skirmish",
-	"spikerush":   "Spike Rush",
-	"swiftplay":   "Swiftplay",
-	"hurm":        "Team Deathmatch",
-	"ggteam":      "Escalation",
-	"onefa":       "Replication",
-	"snowball":    "Snowball Fight",
-	"newmap":      "New Map",
-	"custom":      "Custom",
-	"":            "Unknown",
+	"competitive":       "Competitive",
+	"unrated":           "Unrated",
+	"deathmatch":        "Deathmatch",
+	"skirmish":          "Skirmish",
+	"spikerush":         "Spike Rush",
+	"swiftplay":         "Swiftplay",
+	"hurm":              "Team Deathmatch",
+	"ggteam":            "Escalation",
+	"onefa":             "Replication",
+	"snowball":          "Snowball Fight",
+	"newmap":            "New Map",
+	"custom":            "Custom",
+	"abilitydraftarena": "Gauntlet",
+	"abilitydraft":      "Gauntlet",
+	"gauntlet":          "Gauntlet",
+	"":                  "Unknown",
 }
 
 // GetQueueDisplayName returns the human-readable name for a QueueID.
@@ -44,6 +50,9 @@ func ResolveQueueDisplayName(queueID, gameMode string) string {
 	// Fallback: inspect GameMode asset path
 	if gameMode != "" {
 		gmLower := strings.ToLower(gameMode)
+		if strings.Contains(gmLower, "abilitydraftarena") || strings.Contains(gmLower, "abilitydraft") || strings.Contains(gmLower, "gauntlet") {
+			return "Gauntlet"
+		}
 		if strings.Contains(gmLower, "skirmish") {
 			return "Skirmish"
 		}
@@ -70,4 +79,13 @@ func ResolveQueueDisplayName(queueID, gameMode string) string {
 		}
 	}
 	return GetQueueDisplayName(queueID)
+}
+
+// ResolveAgentDisplayName resolves the agent display name taking into account
+// game modes like Gauntlet where agents are not chosen and must display as "-".
+func ResolveAgentDisplayName(characterID string, agentsMap map[string]string, md *models.MatchDetails) string {
+	if md != nil && md.IsGauntlet() {
+		return "-"
+	}
+	return cache.GetAgentName(characterID, agentsMap)
 }

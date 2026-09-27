@@ -155,10 +155,10 @@ go build -o val0.exe .
 
 ### Local Storage Paths
 All persistent configuration and cache files reside in standard Windows AppData:
-- `%APPDATA%\val-tracker\wishlist.json`: Saved skin wishlist entries.
-- `%APPDATA%\val-tracker\session.json`: Active session baseline and match tracking data.
-- `%APPDATA%\val-tracker\prices.json`: Persisted skin VP pricing database recorded from live storefronts.
-- `%APPDATA%\val-tracker\*.json`: Cached Riot & valorant-api.com metadata (`skins`, `weapons`, `agents`, `maps`, `ranks`, `contracts`, `missions`), automatically invalidated when client patch version changes.
+- `%APPDATA%\val0\wishlist.json`: Saved skin wishlist entries.
+- `%APPDATA%\val0\session.json`: Active session baseline and match tracking data.
+- `%APPDATA%\val0\prices.json`: Persisted skin VP pricing database recorded from live storefronts.
+- `%APPDATA%\val0\*.json`: Cached Riot & valorant-api.com metadata (`skins`, `weapons`, `agents`, `maps`, `ranks`, `contracts`, `missions`), automatically invalidated when client patch version changes.
 
 ---
 

@@ -1972,4 +1972,337 @@ func TestNightMarketModel_BreakpointThreshold(t *testing.T) {
 	}
 }
 
+func TestResolveQueueDisplayName_Gauntlet(t *testing.T) {
+	if name := ResolveQueueDisplayName("abilitydraftarena", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(abilitydraftarena) = %q, want 'Gauntlet'", name)
+	}
+	if name := ResolveQueueDisplayName("abilitydraft", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(abilitydraft) = %q, want 'Gauntlet'", name)
+	}
+	if name := ResolveQueueDisplayName("gauntlet", ""); name != "Gauntlet" {
+		t.Errorf("ResolveQueueDisplayName(gauntlet) = %q, want 'Gauntlet'", name)
+	}
+}
+
+func TestResolveAgentDisplayName_Gauntlet(t *testing.T) {
+	md := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{QueueID: "abilitydraftarena"},
+	}
+	agentsMap := map[string]string{"dade69b4-4f5a-8528-247b-219e5a1facd6": "Fade"}
+	if name := ResolveAgentDisplayName("dade69b4-4f5a-8528-247b-219e5a1facd6", agentsMap, md); name != "-" {
+		t.Errorf("expected '-', got %q", name)
+	}
+}
+
+func TestMatchesModel_GauntletDetailView(t *testing.T) {
+	teams := make([]models.MatchTeam, 8)
+	players := make([]models.MatchPlayer, 16)
+	for i := 0; i < 8; i++ {
+		tID := fmt.Sprintf("Team_%d", i+1)
+		won := (i == 3)
+		rounds := 0
+		if won {
+			rounds = 8
+		}
+		teams[i] = models.MatchTeam{TeamID: tID, Won: won, RoundsWon: rounds}
+		players[i*2] = models.MatchPlayer{
+			Subject:  fmt.Sprintf("player-%d-a", i+1),
+			TeamID:   tID,
+			GameName: fmt.Sprintf("Player%d", i+1),
+		}
+		players[i*2+1] = models.MatchPlayer{
+			Subject:  fmt.Sprintf("player-%d-b", i+1),
+			TeamID:   tID,
+			GameName: fmt.Sprintf("Partner%d", i+1),
+		}
+	}
+
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID: "gauntlet-1",
+			QueueID: "abilitydraftarena",
+			MapID:   "/Game/Maps/Gauntlet/Gauntlet",
+		},
+		Teams:   teams,
+		Players: players,
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-1",
+		MapName:     "Gauntlet",
+		QueueName:   ResolveQueueDisplayName("abilitydraftarena", ""),
+		Outcome:     details.GetMatchOutcome("player-6-a"),
+		Score:       details.ScoreString("player-6-a"),
+		Details:     details,
+		PlayerPUUID: "player-6-a",
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "player-6-a", nil, nil)
+	m.SetSize(120, 60)
+
+	// Enter detail view
+	detailModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view := detailModel.View()
+
+	// Verify Header does NOT contain 0-0 and contains LOSS
+	if strings.Contains(view, "LOSS  0-0") {
+		t.Errorf("header must NOT contain 'LOSS  0-0', got:\n%s", view)
+	}
+	if !strings.Contains(view, "MATCH DETAIL — Gauntlet (Gauntlet)") {
+		t.Errorf("header missing title, got:\n%s", view)
+	}
+
+	// Verify all 8 teams are rendered
+	for i := 1; i <= 8; i++ {
+		expectedTeam := fmt.Sprintf("TEAM_%d TEAM", i)
+		if !strings.Contains(view, expectedTeam) {
+			t.Errorf("expected view to contain %s, got:\n%s", expectedTeam, view)
+		}
+	}
+
+	// Verify Agent and Econ are NOT in the table
+	if strings.Contains(view, "Agent") {
+		t.Errorf("detail scoreboard should NOT display 'Agent', got:\n%s", view)
+	}
+	if strings.Contains(view, "Econ") {
+		t.Errorf("detail scoreboard should NOT display 'Econ', got:\n%s", view)
+	}
+
+	// Verify table header contains streamlined columns
+	if !strings.Contains(view, "Player") || !strings.Contains(view, "ACS") || !strings.Contains(view, "HS%") || !strings.Contains(view, "ADR") {
+		t.Errorf("detail scoreboard missing streamlined columns, got:\n%s", view)
+	}
+
+	// Verify rounds won suffix is completely omitted
+	if strings.Contains(view, "rounds won") || strings.Contains(view, "round won") {
+		t.Errorf("expected rounds won suffix to be omitted from Gauntlet header, got:\n%s", view)
+	}
+}
+
+func TestMatchesModel_DetailViewScrolling(t *testing.T) {
+	teams := make([]models.MatchTeam, 8)
+	players := make([]models.MatchPlayer, 16)
+	for i := 0; i < 8; i++ {
+		tID := fmt.Sprintf("Team_%d", i+1)
+		teams[i] = models.MatchTeam{TeamID: tID, Won: i == 0, RoundsWon: 8 - i}
+		players[i*2] = models.MatchPlayer{Subject: fmt.Sprintf("p%d-a", i+1), TeamID: tID, GameName: fmt.Sprintf("Player%d", i+1)}
+		players[i*2+1] = models.MatchPlayer{Subject: fmt.Sprintf("p%d-b", i+1), TeamID: tID, GameName: fmt.Sprintf("Partner%d", i+1)}
+	}
+
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{MatchID: "gauntlet-scroll", QueueID: "abilitydraftarena"},
+		Teams:     teams,
+		Players:   players,
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-scroll",
+		MapName:     "Gauntlet",
+		QueueName:   "Gauntlet",
+		Details:     details,
+		PlayerPUUID: "p1-a",
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "p1-a", nil, nil)
+	// Small terminal height to force scrolling
+	m.SetSize(120, 20)
+
+	// Enter detail view
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected initial detailScrollOffset=0, got %d", m.detailScrollOffset)
+	}
+
+	view0 := m.View()
+	if !strings.Contains(view0, "[1-15/") {
+		t.Errorf("expected scroll indicator [1-15/...], got:\n%s", view0)
+	}
+	if !strings.Contains(view0, "TEAM_1 TEAM (YOUR TEAM)") {
+		t.Errorf("expected top team in initial scroll view, got:\n%s", view0)
+	}
+
+	// Scroll down with j
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if m.detailScrollOffset != 1 {
+		t.Errorf("expected detailScrollOffset=1 after 'j', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll down with down arrow
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if m.detailScrollOffset != 2 {
+		t.Errorf("expected detailScrollOffset=2 after 'down', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll pgdown (+8)
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if m.detailScrollOffset != 10 {
+		t.Errorf("expected detailScrollOffset=10 after 'pgdown', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll end
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	if m.detailScrollOffset == 0 {
+		t.Errorf("expected clamped max scroll offset on 'end', got 0")
+	}
+
+	// Scroll home
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset=0 on 'home', got %d", m.detailScrollOffset)
+	}
+
+	// Scroll up with k
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset clamped at 0 on 'k', got %d", m.detailScrollOffset)
+	}
+
+	// Return to list with esc
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.viewMode != MatchViewList {
+		t.Errorf("expected viewMode=MatchViewList on 'esc', got %v", m.viewMode)
+	}
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset reset to 0 on 'esc', got %d", m.detailScrollOffset)
+	}
+}
+
+func TestMatchesModel_GauntletListView(t *testing.T) {
+	details := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID: "gauntlet-1",
+			QueueID: "abilitydraftarena",
+			MapID:   "/Game/Maps/Gauntlet/Gauntlet",
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Team_1", Won: true, RoundsWon: 8},
+			{TeamID: "Team_6", Won: false, RoundsWon: 0},
+		},
+		Players: []models.MatchPlayer{
+			{Subject: "player-6-a", TeamID: "Team_6", Stats: models.PlayerStats{Kills: 5, Deaths: 6, Assists: 2}},
+			{Subject: "player-1-a", TeamID: "Team_1", Stats: models.PlayerStats{Kills: 15, Deaths: 2, Assists: 4}},
+		},
+	}
+
+	item := MatchItem{
+		MatchID:     "gauntlet-1",
+		MapName:     "Gauntlet",
+		QueueName:   ResolveQueueDisplayName("abilitydraftarena", ""),
+		AgentName:   ResolveAgentDisplayName("non-agent-uuid", nil, details),
+		Outcome:     details.GetMatchOutcome("player-6-a"),
+		Score:       details.ScoreString("player-6-a"),
+		Details:     details,
+		PlayerPUUID: "player-6-a",
+		Kills:       5,
+		Deaths:      6,
+		Assists:     2,
+	}
+
+	m := NewMatchesModel([]MatchItem{item}, "player-6-a", nil, nil)
+	m.SetSize(120, 40)
+	listView := m.renderListView()
+
+	if !strings.Contains(listView, "Gauntlet") {
+		t.Errorf("expected list view to contain 'Gauntlet', got:\n%s", listView)
+	}
+	if strings.Contains(listView, "Abilitydra..") {
+		t.Errorf("list view should not truncate queue to 'Abilitydra..', got:\n%s", listView)
+	}
+	if strings.Contains(listView, "Agent") {
+		t.Errorf("list view should not display 'Agent', got:\n%s", listView)
+	}
+	if !strings.Contains(listView, "2nd") {
+		t.Errorf("expected list view to contain '2nd' finish, got:\n%s", listView)
+	}
+}
+
+func TestStatsModel_WeaponClassification(t *testing.T) {
+	puUID := "test-player-puuid"
+
+	match := &models.MatchDetails{
+		MatchInfo: models.MatchInfo{
+			MatchID:  "m-tactical-weapons",
+			QueueID:  "competitive",
+			GameMode: "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C",
+		},
+		Players: []models.MatchPlayer{
+			{
+				Subject:     puUID,
+				TeamID:      "Blue",
+				CharacterID: "agent-jett",
+				Stats: models.PlayerStats{
+					Score:        3000,
+					RoundsPlayed: 10,
+					Kills:        4,
+					Deaths:       2,
+					Assists:      1,
+				},
+			},
+		},
+		Teams: []models.MatchTeam{
+			{TeamID: "Blue", Won: true, RoundsWon: 13},
+			{TeamID: "Red", Won: false, RoundsWon: 7},
+		},
+		RoundResults: []models.RoundResult{
+			{
+				PlayerStats: []models.RoundPlayerStat{
+					{
+						Subject: puUID,
+						Kills: []models.RoundKill{
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "5f0786ac-4366-2d39-96bd-2586c6734f07", // Outlaw
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "8db0a1bf-4a50-832a-4566-faaaa6d250ca", // Warden
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "Ability_GrenadeWeapon_C", // Ability (no dashes)
+								},
+							},
+							{
+								Killer: puUID,
+								FinishingDamage: models.FinishingDamage{
+									DamageItem: "11111111-2222-3333-4444-555555555555", // Unknown Weapon (with dashes)
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	sm := NewStatsModel([]*models.MatchDetails{match}, puUID, nil, nil, nil, "Diamond 1")
+
+	expectedWeapons := map[string]int{
+		"Outlaw":         1,
+		"Warden":         1,
+		"Ability":        1,
+		"Unknown Weapon": 1,
+	}
+
+	if len(sm.weaponStats) != 4 {
+		t.Fatalf("expected 4 weapon stats, got %d", len(sm.weaponStats))
+	}
+
+	for _, ws := range sm.weaponStats {
+		expectedKills, found := expectedWeapons[ws.WeaponName]
+		if !found {
+			t.Errorf("unexpected weapon stat: %s", ws.WeaponName)
+		} else if ws.Kills != expectedKills {
+			t.Errorf("expected %d kills for %s, got %d", expectedKills, ws.WeaponName, ws.Kills)
+		}
+	}
+}
+
+
+
 

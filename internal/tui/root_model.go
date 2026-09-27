@@ -46,7 +46,7 @@ func NewRootModel() RootModel {
 }
 
 func (m RootModel) Init() tea.Cmd {
-	return authenticateCmd
+	return tea.Batch(tea.SetWindowTitle("val0"), authenticateCmd)
 }
 
 func authenticateCmd() tea.Msg {
