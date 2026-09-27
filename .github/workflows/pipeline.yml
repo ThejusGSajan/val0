@@ -190,8 +190,13 @@ jobs:
             ---
             ### Verification
             Verify the integrity of `val0.exe` using SHA256:
+            **PowerShell**
+            ```powershell
+            Get-FileHash .\val0.exe -Algorithm SHA256
             ```
-            $(cat dist/val0.exe.sha256)
+            **Command Prompt (cmd)**
+            ```cmd
+            certutil -hashfile val0.exe SHA256
             ```
           draft: true
           prerelease: false
