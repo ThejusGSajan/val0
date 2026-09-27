@@ -67,7 +67,7 @@ jobs:
     needs: test
     if: |
       github.ref == 'refs/heads/main' &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       !contains(github.event.head_commit.message, '[skip release]') &&
       !inputs.dry_run
     runs-on: ubuntu-latest
